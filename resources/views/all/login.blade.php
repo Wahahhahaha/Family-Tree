@@ -38,7 +38,7 @@
             </div>
 
             <div class="row">
-                <a class="forgot" href="#">Forgot password?</a>
+                <a class="forgot" href="/forgot-password">Forgot password?</a>
             </div>
 
             <button class="btn-login" type="submit">Sign In</button>

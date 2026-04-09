@@ -13,9 +13,15 @@
         $canEditOwnProfile = $currentLevelId === 2 && !empty($currentFamilyProfile);
         $canAddMemberFromHome = $currentRoleId === 3 || $currentLevelId === 2;
         $activePanel = old('home_panel', 'profile');
+        $currentMemberHasPartner = (bool) ($currentMemberHasPartner ?? false);
         $defaultRelationType = old('relation_type', 'child');
-        $defaultTargetMemberId = (int) old('target_memberid', $firstMember->memberid ?? 0);
-        $targetMember = $members->firstWhere('memberid', $defaultTargetMemberId) ?: $firstMember;
+        $defaultChildParentingMode = old('child_parenting_mode', $currentMemberHasPartner ? 'with_current_partner' : 'single_parent');
+        if (!$currentMemberHasPartner && $defaultChildParentingMode === 'with_current_partner') {
+            $defaultChildParentingMode = 'single_parent';
+        }
+        $defaultTargetMemberId = (int) ($currentMember->memberid ?? 0);
+        $targetMember = $currentMember ?: $firstMember;
+        $isFirstMemberMe = $firstMember && (int) ($firstMember->userid ?? 0) === $currentUserId;
         $relationMap = $relationLabels ?? [];
         $firstMemberRelation = $firstMember ? ($relationMap[(int) $firstMember->memberid] ?? 'Family Member') : 'Family Member';
         $totalMembers = $members->count();
@@ -25,11 +31,24 @@
         $deceasedMembers = $members->filter(function ($member) {
             return strtolower((string) ($member->life_status ?? '')) === 'deceased';
         })->count();
+        $flashMessages = [];
+        if (session('success')) {
+            $flashMessages[] = ['type' => 'success', 'text' => (string) session('success')];
+        }
+        if (session('error')) {
+            $flashMessages[] = ['type' => 'error', 'text' => (string) session('error')];
+        }
+        if ($errors->any()) {
+            foreach ($errors->all() as $errorText) {
+                $flashMessages[] = ['type' => 'error', 'text' => (string) $errorText];
+            }
+        }
+        $addMemberSuccessModal = strtolower((string) session('success', '')) === 'new family member has been added.';
     ?>
 
     <section class="stats">
         <article class="stat-card">
-            <small>Total Family Members (Level 2)</small>
+            <small>Total Family Members</small>
             <h2><?php echo e($totalMembers); ?></h2>
         </article>
         <article class="stat-card">
@@ -46,19 +65,25 @@
         </article>
     </section>
 
-    <?php if (session('success')): ?>
-        <div class="alert-success"><?php echo e(session('success')); ?></div>
-    <?php endif; ?>
-
-    <?php if (session('error')): ?>
-        <div class="alert-error"><?php echo e(session('error')); ?></div>
-    <?php endif; ?>
-
-    <?php if ($errors->any()): ?>
-        <div class="alert-error">
-            <?php foreach ($errors->all() as $error): ?>
-                <div><?php echo e($error); ?></div>
-            <?php endforeach; ?>
+    <?php if (!empty($flashMessages)): ?>
+        <div id="flashMessageModal" class="message-modal is-open" role="dialog" aria-modal="true" aria-labelledby="flashMessageTitle">
+            <div class="message-modal-backdrop"></div>
+            <div class="message-modal-card <?php echo e($addMemberSuccessModal ? 'is-add-member-success' : ''); ?>">
+                <h4 id="flashMessageTitle"><?php echo e($addMemberSuccessModal ? 'Member Added' : 'Message'); ?></h4>
+                <?php if ($addMemberSuccessModal): ?>
+                    <div class="message-modal-success-icon" aria-hidden="true">
+                        <span></span>
+                    </div>
+                <?php endif; ?>
+                <div class="message-modal-body">
+                    <?php foreach ($flashMessages as $flashMessage): ?>
+                        <p class="message-modal-text <?php echo e($flashMessage['type'] === 'success' ? 'is-success' : 'is-error'); ?>">
+                            <?php echo e($flashMessage['text']); ?>
+                        </p>
+                    <?php endforeach; ?>
+                </div>
+                <button id="flashMessageOkBtn" type="button" class="btn btn-primary">OK</button>
+            </div>
         </div>
     <?php endif; ?>
 
@@ -67,26 +92,38 @@
             <div class="tree-head">
                 <div>
                     <h3>Family Tree Structure</h3>
-                    <p>Showing users with level ID 2.</p>
+                    <p>Get to know your family members.</p>
                 </div>
-                <input id="searchMember" class="search" type="search" placeholder="Search family member">
+                <div class="tree-tools">
+                    <input id="searchMember" class="search" type="search" placeholder="Search family member">
+                    <div class="tree-zoom-controls">
+                        <button id="treeZoomOutBtn" class="btn btn-ghost tree-zoom-btn" type="button" aria-label="Zoom out">-</button>
+                        <span id="treeZoomValue" class="tree-zoom-value">100%</span>
+                        <button id="treeZoomInBtn" class="btn btn-ghost tree-zoom-btn" type="button" aria-label="Zoom in">+</button>
+                    </div>
+                </div>
             </div>
 
-            <?php if ($members->isEmpty()): ?>
-                <p>No family member data found for users with level ID 2.</p>
-            <?php else: ?>
-                <div class="tree">
-                    <ul>
-                        <?php foreach ($renderTreeRoots as $node): ?>
-                            <?php echo view('all.partials.family-tree-node', [
-                                'node' => $node,
-                                'initialMemberId' => $firstMember->memberid ?? 0,
-                                'relationMap' => $relationMap,
-                            ]); ?>
-                        <?php endforeach; ?>
-                    </ul>
-                </div>
-            <?php endif; ?>
+            <div id="treeScrollArea" class="tree-scroll">
+                <?php if ($members->isEmpty()): ?>
+                    <p>No family member data found for users with level ID 2.</p>
+                <?php else: ?>
+                    <div id="treeZoomStage" class="tree-zoom-stage">
+                        <div id="treeCanvas" class="tree">
+                            <ul>
+                                <?php foreach ($renderTreeRoots as $node): ?>
+                                    <?php echo view('all.partials.family-tree-node', [
+                                        'node' => $node,
+                                        'initialMemberId' => $firstMember->memberid ?? 0,
+                                        'relationMap' => $relationMap,
+                                        'depth' => 0,
+                                    ]); ?>
+                                <?php endforeach; ?>
+                            </ul>
+                        </div>
+                    </div>
+                <?php endif; ?>
+            </div>
         </div>
 
         <aside class="detail">
@@ -116,12 +153,18 @@
             <div id="memberDetailBlock" class="<?php echo e($activePanel === 'add-member' ? 'hidden' : ''); ?>">
                 <h4>Member Details</h4>
                 <div class="detail-card">
-                    <img
-                        id="detailPhoto"
-                        class="detail-photo"
-                        src="<?php echo e($firstMember->picture ?? ''); ?>"
-                        alt="<?php echo e($firstMember->name ?? 'Member'); ?>"
-                    >
+                    <div id="detailPhotoWrap" class="detail-photo-wrap <?php echo e($isFirstMemberMe ? 'is-editable' : ''); ?>">
+                        <img
+                            id="detailPhoto"
+                            class="detail-photo <?php echo e($isFirstMemberMe ? 'is-editable' : ''); ?>"
+                            src="<?php echo e($firstMember->picture ?? ''); ?>"
+                            alt="<?php echo e($firstMember->name ?? 'Member'); ?>"
+                            data-isme="<?php echo e($isFirstMemberMe ? '1' : '0'); ?>"
+                        >
+                        <span class="detail-photo-overlay" aria-hidden="true">
+                            <span class="detail-photo-icon"></span>
+                        </span>
+                    </div>
                     <h5 id="detailName" class="detail-name"><?php echo e($firstMember->name ?? '-'); ?></h5>
                     <p id="detailRole" class="detail-role"><?php echo e($firstMemberRelation); ?></p>
                     <ul class="detail-list">
@@ -140,9 +183,11 @@
                         <div id="profilePanel" class="detail-panel <?php echo e($activePanel === 'add-member' ? 'hidden' : ''); ?>">
                             <h5>Complete Your Profile</h5>
                             <p>Fill in job, address, and education if your data is empty.</p>
-                            <form method="POST" action="/family/profile" class="detail-form">
+                            <div id="profileAjaxAlert" class="hidden"></div>
+                            <form id="profileForm" method="POST" action="/family/profile" class="detail-form" enctype="multipart/form-data">
                                 <?php echo csrf_field(); ?>
                                 <input type="hidden" name="home_panel" value="profile">
+                                <input id="profilePictureInput" type="file" name="picture" accept="image/*" class="hidden">
 
                                 <div class="detail-form-field">
                                     <label for="profileJob">Job</label>
@@ -180,13 +225,30 @@
                                 <button type="submit" class="btn btn-primary">Save Profile</button>
                             </form>
                         </div>
+
+                        <div id="photoCropModal" class="photo-crop-modal hidden" role="dialog" aria-modal="true" aria-labelledby="photoCropTitle">
+                            <div class="photo-crop-backdrop"></div>
+                            <div class="photo-crop-card">
+                                <h4 id="photoCropTitle">Crop Profile Photo</h4>
+                                <p>Move and zoom to adjust your photo.</p>
+                                <div class="photo-crop-stage-wrap">
+                                    <canvas id="photoCropCanvas" class="photo-crop-canvas" width="320" height="320"></canvas>
+                                </div>
+                                <div class="photo-crop-zoom">
+                                    <label for="photoCropZoom">Zoom</label>
+                                    <input id="photoCropZoom" type="range" min="1" max="3" step="0.01" value="1">
+                                </div>
+                                <div class="photo-crop-actions">
+                                    <button id="photoCropCancelBtn" type="button" class="btn btn-ghost">Cancel</button>
+                                    <button id="photoCropApplyBtn" type="button" class="btn btn-primary">Apply</button>
+                                </div>
+                            </div>
+                        </div>
                     <?php endif; ?>
 
                     <?php if ($canAddMemberFromHome): ?>
                         <div id="addMemberPanel" class="detail-panel <?php echo e($activePanel === 'add-member' ? '' : 'hidden'); ?>">
-                            <h5>Add Family Member</h5>
-                            <p>Add a new member (for example: your wife, child, or other family).</p>
-                            <form method="POST" action="/family/member/store" class="detail-form">
+                           <form method="POST" action="/family/member/store" class="detail-form">
                                 <?php echo csrf_field(); ?>
                                 <input type="hidden" name="home_panel" value="add-member">
                                 <input type="hidden" id="relationTypeInput" name="relation_type" value="<?php echo e($defaultRelationType); ?>">
@@ -222,7 +284,16 @@
                                         value="<?php echo e($targetMember->name ?? '-'); ?>"
                                         readonly
                                     >
-                                    <small>Click a member card on the left to change the target.</small>
+                                    <small>Member relation is always added under your account.</small>
+                                </div>
+
+                                <div id="childParentingModeField" class="detail-form-field <?php echo e($defaultRelationType === 'child' ? '' : 'hidden'); ?>">
+                                    <label for="childParentingMode">Child Parent Mode</label>
+                                    <select id="childParentingMode" name="child_parenting_mode">
+                                        <option value="with_current_partner" <?php echo e($defaultChildParentingMode === 'with_current_partner' ? 'selected' : ''); ?> <?php echo e(!$currentMemberHasPartner ? 'disabled' : ''); ?>>With current partner</option>
+                                        <option value="single_parent" <?php echo e($defaultChildParentingMode === 'single_parent' ? 'selected' : ''); ?>>Single parent</option>
+                                    </select>
+                                    <small>Use Single parent if the child is not from your current partner.</small>
                                 </div>
 
                                 <div class="detail-form-field">
@@ -267,17 +338,6 @@
                                 <div class="detail-form-field">
                                     <label for="memberAddress">Address</label>
                                     <input id="memberAddress" type="text" name="address" value="<?php echo e(old('address')); ?>" placeholder="Enter address" required>
-                                </div>
-
-                                <div class="detail-form-field">
-                                    <label for="memberMaritalStatus">Marital Status</label>
-                                    <select id="memberMaritalStatus" name="marital_status" required>
-                                        <option value="">Select marital status</option>
-                                        <option value="single" <?php echo e(old('marital_status') === 'single' ? 'selected' : ''); ?>>Single</option>
-                                        <option value="married" <?php echo e(old('marital_status') === 'married' ? 'selected' : ''); ?>>Married</option>
-                                        <option value="divorced" <?php echo e(old('marital_status') === 'divorced' ? 'selected' : ''); ?>>Divorced</option>
-                                        <option value="widowed" <?php echo e(old('marital_status') === 'widowed' ? 'selected' : ''); ?>>Widowed</option>
-                                    </select>
                                 </div>
 
                                 <button type="submit" class="btn btn-primary">Add Member</button>

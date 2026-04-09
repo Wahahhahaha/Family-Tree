@@ -41,7 +41,6 @@
                         <th>Role</th>
                         <th>Email</th>
                         <th>Phone</th>
-                        <th>Source</th>
                         <th>Action</th>
                     </tr>
                 </thead>
@@ -77,7 +76,7 @@
                     <?php foreach ($levels as $level): ?>
                         <option
                             value="<?php echo e($level->levelid); ?>"
-                            data-level-group="<?php echo e(stripos((string) $level->levelname, 'family') !== false ? 'family' : 'employer'); ?>"
+                            data-level-group="<?php echo e(in_array((int) $level->levelid, [2, 4], true) ? 'family' : 'employer'); ?>"
                             <?php echo e((string) old('levelid') === (string) $level->levelid ? 'selected' : ''); ?>
                         >
                             <?php echo e($level->levelname); ?>
@@ -86,7 +85,7 @@
                 </select>
             </div>
 
-            <div class="modal-field">
+            <div id="newRoleField" class="modal-field">
                 <label for="newRole">Role</label>
                 <select id="newRole" name="roleid" required disabled>
                     <option value="">Select role</option>

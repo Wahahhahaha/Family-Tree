@@ -3,6 +3,8 @@
     $nodePartners = $node['partners'] ?? [];
     $nodeChildren = $node['children'] ?? [];
     $relationMap = $relationMap ?? [];
+    $depth = (int) ($depth ?? 0);
+    $maxVisibleDepth = 4;
     $isActive = (int) ($nodeMember->memberid ?? 0) === (int) ($initialMemberId ?? 0);
     $currentUserId = (int) (session('authenticated_user.userid') ?? 0);
     $isMe = (int) ($nodeMember->userid ?? 0) === $currentUserId;
@@ -22,6 +24,7 @@
             data-address="<?php echo e($nodeMember->address ?: '-'); ?>"
             data-education="<?php echo e($nodeMember->education_status ?: '-'); ?>"
             data-photo="<?php echo e($nodeMember->picture); ?>"
+            data-isme="<?php echo e($isMe ? '1' : '0'); ?>"
         >
             <img class="member-photo" src="<?php echo e($nodeMember->picture); ?>" alt="<?php echo e($nodeMember->name); ?>">
             <h4 class="member-name"><?php echo e($nodeMember->name); ?></h4>
@@ -46,6 +49,7 @@
                 data-address="<?php echo e($partner->address ?: '-'); ?>"
                 data-education="<?php echo e($partner->education_status ?: '-'); ?>"
                 data-photo="<?php echo e($partner->picture); ?>"
+                data-isme="<?php echo e($isPartnerMe ? '1' : '0'); ?>"
             >
                 <img class="member-photo" src="<?php echo e($partner->picture); ?>" alt="<?php echo e($partner->name); ?>">
                 <h4 class="member-name"><?php echo e($partner->name); ?></h4>
@@ -58,13 +62,26 @@
         <?php endforeach; ?>
     </div>
 
-    <?php if (!empty($nodeChildren)): ?>
+    <?php if (!empty($nodeChildren) && $depth < $maxVisibleDepth): ?>
         <ul>
             <?php foreach ($nodeChildren as $childNode): ?>
                 <?php echo view('all.partials.family-tree-node', [
                     'node' => $childNode,
                     'initialMemberId' => $initialMemberId,
                     'relationMap' => $relationMap,
+                    'depth' => $depth + 1,
+                ]); ?>
+            <?php endforeach; ?>
+        </ul>
+    <?php elseif (!empty($nodeChildren)): ?>
+        <button type="button" class="btn btn-ghost tree-see-more-btn" data-open="0">See more</button>
+        <ul class="tree-extra-children hidden">
+            <?php foreach ($nodeChildren as $childNode): ?>
+                <?php echo view('all.partials.family-tree-node', [
+                    'node' => $childNode,
+                    'initialMemberId' => $initialMemberId,
+                    'relationMap' => $relationMap,
+                    'depth' => $depth + 1,
                 ]); ?>
             <?php endforeach; ?>
         </ul>

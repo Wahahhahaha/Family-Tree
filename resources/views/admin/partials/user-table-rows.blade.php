@@ -6,7 +6,6 @@
         <td><?php echo e($user->rolename ?? '-'); ?></td>
         <td><?php echo e($user->email); ?></td>
         <td><?php echo e($user->phone); ?></td>
-        <td><?php echo e($user->source); ?></td>
         <td>
             <div class="action-group">
                 <form method="POST" action="/management/users/<?php echo e($user->userid); ?>/reset-password">
