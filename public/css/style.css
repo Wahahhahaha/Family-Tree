@@ -595,6 +595,10 @@
     cursor: pointer;
 }
 
+.page-family-tree .tree-scroll.is-pannable .member-card {
+    cursor: default;
+}
+
 .page-family-tree .tree-head {
     display: flex;
     justify-content: space-between;
@@ -754,7 +758,7 @@
     flex-direction: column;
     align-items: center;
     transition: 0.25s transform, 0.25s box-shadow, 0.25s border-color;
-    cursor: pointer;
+    cursor: default;
 }
 
 .page-family-tree .partner-row {
@@ -774,6 +778,30 @@
 .page-family-tree .member-card.active {
     border-color: var(--primary);
     box-shadow: 0 0 0 4px rgba(31, 154, 214, 0.12), var(--shadow-hover);
+}
+
+.page-family-tree .member-card.is-deceased {
+    background: #f2f4f7;
+    border-color: #d7dce3;
+}
+
+.page-family-tree .member-card.is-deceased .member-photo {
+    filter: grayscale(1);
+    opacity: 0.9;
+}
+
+.page-family-tree .member-card.is-deceased .member-name {
+    color: #4c5968;
+}
+
+.page-family-tree .member-card.is-deceased .member-role,
+.page-family-tree .member-card.is-deceased .member-age {
+    color: #6f7b88;
+}
+
+.page-family-tree .member-card.is-deceased .member-me-badge {
+    background: #e4e8ee;
+    color: #4f5e6d;
 }
 
 .page-family-tree .member-photo {
@@ -870,6 +898,16 @@
     background: linear-gradient(160deg, #f1f9fd, #f5fcf7);
     border: 1px solid #dcecf3;
     padding: 14px;
+}
+
+.page-family-tree .detail-card.is-deceased {
+    background: linear-gradient(160deg, #f2f4f7, #eef1f5);
+    border-color: #d5dbe3;
+}
+
+.page-family-tree .detail-card.is-deceased .detail-photo {
+    filter: grayscale(1);
+    opacity: 0.9;
 }
 
 .page-family-tree .detail-photo {
@@ -1001,6 +1039,92 @@
     gap: 10px;
 }
 
+.page-family-tree .profile-form-card {
+    margin-bottom: 10px;
+    border: 1px solid #dfeaf3;
+    background: linear-gradient(180deg, #f8fcff 0%, #f4f9fd 100%);
+    border-radius: 14px;
+    padding: 12px;
+}
+
+.page-family-tree .profile-form-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.page-family-tree .profile-form-head h5 {
+    margin: 0;
+}
+
+.page-family-tree .profile-form-head p {
+    margin: 4px 0 0;
+    font-size: 12px;
+    color: var(--muted);
+    font-weight: 600;
+}
+
+.page-family-tree .profile-completion-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    height: 28px;
+    padding: 0 10px;
+    border-radius: 999px;
+    background: #e1f1fb;
+    border: 1px solid #c4e3f5;
+    color: #0b6790;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
+.page-family-tree .profile-completion-track {
+    width: 100%;
+    height: 8px;
+    border-radius: 999px;
+    background: #e7eef5;
+    overflow: hidden;
+}
+
+.page-family-tree .profile-completion-bar {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #1991c8 0%, #27b0d9 100%);
+    transition: width 0.2s ease;
+}
+
+.page-family-tree .profile-form-grid {
+    display: grid;
+    gap: 10px;
+}
+
+.page-family-tree .detail-form-field-profile input {
+    background: #ffffff;
+    border-color: #d4e2ed;
+}
+
+.page-family-tree .profile-form-actions {
+    margin-top: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.page-family-tree .profile-form-actions small {
+    margin: 0;
+    color: #5f7382;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.35;
+}
+
 .page-family-tree .detail-panel-switch {
     display: flex;
     gap: 8px;
@@ -1015,6 +1139,62 @@
 .page-family-tree .panel-switch-btn.is-active {
     background: #dff0fb;
     color: #0c6c95;
+}
+
+.page-family-tree .member-action-block {
+    margin-top: 12px;
+    padding: 12px;
+    border-radius: 14px;
+    border: 1px solid #deebf4;
+    background: #f8fcff;
+    display: grid;
+    gap: 10px;
+}
+
+.page-family-tree .member-action-block h5 {
+    margin: 0;
+    font-size: 13px;
+    color: #20455c;
+    font-weight: 800;
+}
+
+.page-family-tree .btn-danger-soft {
+    color: #8e2f3c;
+    background: #ffeef0;
+    border: 1px solid #f3c6cc;
+}
+
+.page-family-tree .btn-danger-soft:hover {
+    background: #ffe1e4;
+}
+
+.page-family-tree .btn-block {
+    width: 100%;
+}
+
+.page-family-tree .member-action-block label {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #224257;
+}
+
+.page-family-tree .life-status-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.page-family-tree .life-status-row select {
+    flex: 1;
+    height: 40px;
+    border-radius: 10px;
+    border: 1px solid #d7e4ef;
+    background: #fbfdff;
+    padding: 0 11px;
+    font-size: 13px;
+    outline: none;
 }
 
 .page-family-tree .detail-panel.hidden {
@@ -1069,6 +1249,22 @@
     box-shadow: 0 0 0 4px rgba(31, 154, 214, 0.15);
 }
 
+@media (max-width: 640px) {
+    .page-family-tree .profile-form-head {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .page-family-tree .profile-form-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .page-family-tree .profile-form-actions .btn {
+        width: 100%;
+    }
+}
+
 .page-family-tree .management-card {
     margin-top: 18px;
     background: #ffffff;
@@ -1097,6 +1293,24 @@
     max-width: 720px;
 }
 
+.page-family-tree .account-grid {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 14px;
+    align-items: start;
+    max-width: none;
+}
+
+.page-family-tree .account-grid .account-card,
+.page-family-tree .account-edit-card {
+    max-width: none;
+}
+
+.page-family-tree .account-summary-card {
+    background: linear-gradient(165deg, #ffffff, #f7fbfe);
+}
+
 .page-family-tree .account-card h2 {
     margin: 0 0 6px;
     font-size: 22px;
@@ -1123,9 +1337,9 @@
     justify-content: space-between;
     gap: 12px;
     padding: 12px 14px;
-    border: 1px solid #e7eff5;
+    border: 1px solid #deebf4;
     border-radius: 14px;
-    background: #f9fcfe;
+    background: #f5fbff;
 }
 
 .page-family-tree .account-list span {
@@ -1137,6 +1351,24 @@
 .page-family-tree .account-list strong {
     color: #16354c;
     font-size: 13px;
+}
+
+.page-family-tree .account-photo-editor {
+    margin-top: 12px;
+    margin-bottom: 14px;
+    display: grid;
+    justify-items: start;
+    gap: 8px;
+}
+
+.page-family-tree .account-detail-photo-wrap {
+    cursor: pointer;
+}
+
+.page-family-tree .account-photo-editor small {
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 600;
 }
 
 .page-family-tree .settings-head h2 {
@@ -1159,6 +1391,23 @@
     max-width: 680px;
 }
 
+.page-family-tree .account-form {
+    margin-top: 16px;
+    max-width: none;
+}
+
+.page-family-tree .account-form-grid {
+    grid-template-columns: 1fr;
+}
+
+.page-family-tree .account-form-grid .btn {
+    width: 100%;
+}
+
+.page-family-tree .account-family-profile-card {
+    max-width: none;
+}
+
 .page-family-tree .settings-field label {
     display: block;
     margin-bottom: 6px;
@@ -1168,6 +1417,7 @@
 }
 
 .page-family-tree .settings-field input[type="text"],
+.page-family-tree .settings-field input[type="email"],
 .page-family-tree .settings-field input[type="file"] {
     width: 100%;
     border-radius: 10px;
@@ -1176,6 +1426,19 @@
     padding: 10px 11px;
     font-size: 14px;
     outline: none;
+}
+
+.page-family-tree .settings-field input[readonly],
+.page-family-tree .settings-field input:disabled {
+    background: #eef4f8;
+    color: #486478;
+    cursor: not-allowed;
+}
+
+.page-family-tree .settings-field input[type="text"]:focus,
+.page-family-tree .settings-field input[type="email"]:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 4px rgba(31, 154, 214, 0.14);
 }
 
 .page-family-tree .settings-field small {
@@ -1262,6 +1525,26 @@
 
 .page-family-tree .table-wrap {
     overflow-x: auto;
+}
+
+@media (max-width: 900px) {
+    .page-family-tree .account-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .page-family-tree .account-card {
+        max-width: 100%;
+    }
+}
+
+@media (max-width: 720px) {
+    .page-family-tree .account-form-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .page-family-tree .account-form-grid .btn {
+        width: 100%;
+    }
 }
 
 .page-family-tree .message-modal {

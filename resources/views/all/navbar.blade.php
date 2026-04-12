@@ -27,6 +27,8 @@
                 <div class="dropdown-menu" data-dropdown-menu>
                     <a href="/management/users" class="dropdown-item">User Management</a>
                     <?php if ($currentRoleId === 1): ?>
+                        <a href="/management/activity-log" class="dropdown-item">Activity Log</a>
+                        <a href="/management/recycle-bin" class="dropdown-item">Recycle Bin</a>
                         <a href="/setting" class="dropdown-item">Setting</a>
                     <?php endif; ?>
                 </div>

@@ -31,6 +31,9 @@
     var userTableBody = document.getElementById("userTableBody");
     var userPagination = document.getElementById("userPagination");
     var userTableCount = document.getElementById("userTableCount");
+    var activityLogTableBody = document.getElementById("activityLogTableBody");
+    var activityLogPagination = document.getElementById("activityLogPagination");
+    var activityLogTableCount = document.getElementById("activityLogTableCount");
     var systemLogoInput = document.getElementById("systemLogoInput");
     var systemLogoPreview = document.getElementById("systemLogoPreview");
     var systemLogoPlaceholder = document.getElementById("systemLogoPlaceholder");
@@ -39,24 +42,40 @@
     var csrfMeta = document.querySelector('meta[name="csrf-token"]');
     var csrfToken = csrfMeta ? csrfMeta.getAttribute("content") : "";
     var cards = Array.prototype.slice.call(document.querySelectorAll(".member-card"));
-    var search = document.getElementById("searchMember");
     var treeContainer = document.getElementById("treeScrollArea");
     var treeZoomStage = document.getElementById("treeZoomStage");
     var treeCanvas = document.getElementById("treeCanvas");
+    var saveTreeImageBtn = document.getElementById("saveTreeImageBtn");
     var treeZoomInBtn = document.getElementById("treeZoomInBtn");
     var treeZoomOutBtn = document.getElementById("treeZoomOutBtn");
     var treeZoomValue = document.getElementById("treeZoomValue");
     var detailName = document.getElementById("detailName");
     var detailRole = document.getElementById("detailRole");
     var detailAge = document.getElementById("detailAge");
+    var detailBirthdate = document.getElementById("detailBirthdate");
+    var detailBirthplace = document.getElementById("detailBirthplace");
     var detailStatus = document.getElementById("detailStatus");
+    var detailPhone = document.getElementById("detailPhone");
+    var detailEmail = document.getElementById("detailEmail");
     var detailJob = document.getElementById("detailJob");
     var detailAddress = document.getElementById("detailAddress");
     var detailEducation = document.getElementById("detailEducation");
     var detailGeneration = document.getElementById("detailGeneration");
+    var detailCard = document.getElementById("detailCard");
     var detailPhoto = document.getElementById("detailPhoto");
     var detailPhotoWrap = document.getElementById("detailPhotoWrap");
     var detailPhotoHint = document.getElementById("detailPhotoHint");
+    var memberActionBlock = document.getElementById("memberActionBlock");
+    var deletePartnerForm = document.getElementById("deletePartnerForm");
+    var deleteChildForm = document.getElementById("deleteChildForm");
+    var lifeStatusForm = document.getElementById("lifeStatusForm");
+    var deletePartnerMemberIdInput = document.getElementById("deletePartnerMemberIdInput");
+    var deleteChildMemberIdInput = document.getElementById("deleteChildMemberIdInput");
+    var lifeStatusMemberIdInput = document.getElementById("lifeStatusMemberIdInput");
+    var lifeStatusSelect = document.getElementById("lifeStatusSelect");
+    var saveLifeStatusBtn = document.getElementById("saveLifeStatusBtn");
+    var adminProfileForm = document.getElementById("adminProfileForm");
+    var accountAdminAjaxAlert = document.getElementById("accountAdminAjaxAlert");
     var profileForm = document.getElementById("profileForm");
     var profileAjaxAlert = document.getElementById("profileAjaxAlert");
     var profilePanelBtn = document.getElementById("profilePanelBtn");
@@ -252,14 +271,12 @@
     }
 
     function setSidePanel(panelName) {
-        if (profilePanel && addMemberPanel) {
-            if (panelName === "add-member") {
-                profilePanel.classList.add("hidden");
-                addMemberPanel.classList.remove("hidden");
-            } else {
-                profilePanel.classList.remove("hidden");
-                addMemberPanel.classList.add("hidden");
-            }
+        if (profilePanel) {
+            profilePanel.classList.toggle("hidden", panelName === "add-member");
+        }
+
+        if (addMemberPanel) {
+            addMemberPanel.classList.toggle("hidden", panelName !== "add-member");
         }
 
         if (memberDetailBlock) {
@@ -424,20 +441,6 @@
         return target.toString();
     }
 
-    function bindPaginationLinks() {
-        if (!userPagination) {
-            return;
-        }
-
-        var links = userPagination.querySelectorAll("a.page-link");
-        Array.prototype.forEach.call(links, function (link) {
-            link.addEventListener("click", function (event) {
-                event.preventDefault();
-                fetchUsersPage(link.getAttribute("href"));
-            });
-        });
-    }
-
     function fetchUsersPage(url) {
         if (!userTableBody || !userPagination || !url) {
             return;
@@ -449,14 +452,51 @@
                 "Accept": "application/json"
             }
         })
-            .then(function (response) { return response.json(); })
+            .then(function (response) {
+                if (!response.ok) {
+                    throw new Error("Failed to load users page.");
+                }
+                return response.json();
+            })
             .then(function (data) {
                 userTableBody.innerHTML = data.rows_html || "";
                 userPagination.innerHTML = data.pagination_html || "";
                 if (userTableCount && typeof data.total !== "undefined") {
                     userTableCount.textContent = "Total: " + data.total + " users";
                 }
-                bindPaginationLinks();
+                var browserUrl = new URL(url, window.location.origin);
+                browserUrl.searchParams.delete("ajax");
+                window.history.pushState({}, "", browserUrl.toString());
+            })
+            .catch(function () {});
+    }
+
+    function fetchActivityLogPage(url) {
+        if (!activityLogTableBody || !activityLogPagination || !url) {
+            return;
+        }
+
+        fetch(getAjaxUrl(url), {
+            headers: {
+                "X-Requested-With": "XMLHttpRequest",
+                "Accept": "application/json"
+            }
+        })
+            .then(function (response) {
+                if (!response.ok) {
+                    throw new Error("Failed to load activity log page.");
+                }
+                return response.json();
+            })
+            .then(function (data) {
+                activityLogTableBody.innerHTML = data.rows_html || "";
+                activityLogPagination.innerHTML = data.pagination_html || "";
+                if (activityLogTableCount && typeof data.total !== "undefined") {
+                    activityLogTableCount.textContent = "Total: " + data.total + " records";
+                }
+                var browserUrl = new URL(url, window.location.origin);
+                browserUrl.searchParams.delete("ajax");
+                window.history.pushState({}, "", browserUrl.toString());
             })
             .catch(function () {});
     }
@@ -513,7 +553,104 @@
         });
     }
 
-    bindPaginationLinks();
+    if (userPagination && userTableBody) {
+        userPagination.addEventListener("click", function (event) {
+            var target = event.target.closest("a.page-link");
+            if (!target) {
+                return;
+            }
+
+            event.preventDefault();
+            fetchUsersPage(target.getAttribute("href"));
+        });
+    }
+
+    if (activityLogPagination && activityLogTableBody) {
+        activityLogPagination.addEventListener("click", function (event) {
+            var target = event.target.closest("a.page-link");
+            if (!target) {
+                return;
+            }
+
+            event.preventDefault();
+            fetchActivityLogPage(target.getAttribute("href"));
+        });
+    }
+
+    if (adminProfileForm) {
+        adminProfileForm.addEventListener("submit", function (event) {
+            event.preventDefault();
+
+            if (accountAdminAjaxAlert) {
+                accountAdminAjaxAlert.className = "hidden";
+                accountAdminAjaxAlert.innerHTML = "";
+            }
+
+            var formData = new FormData(adminProfileForm);
+            fetch(adminProfileForm.getAttribute("action"), {
+                method: "POST",
+                headers: {
+                    "X-Requested-With": "XMLHttpRequest",
+                    "Accept": "application/json",
+                    "X-CSRF-TOKEN": csrfToken
+                },
+                body: formData
+            })
+                .then(function (response) {
+                    return response.json().then(function (data) {
+                        return { ok: response.ok, status: response.status, data: data };
+                    });
+                })
+                .then(function (result) {
+                    if (!accountAdminAjaxAlert) {
+                        return;
+                    }
+
+                    if (!result.ok) {
+                        var html = "";
+                        if (result.status === 422 && result.data.errors) {
+                            Object.keys(result.data.errors).forEach(function (key) {
+                                var messages = result.data.errors[key];
+                                messages.forEach(function (msg) {
+                                    html += "<div>" + msg + "</div>";
+                                });
+                            });
+                        } else {
+                            html = "<div>" + (result.data.message || "Failed to save profile.") + "</div>";
+                        }
+
+                        accountAdminAjaxAlert.className = "alert-error";
+                        accountAdminAjaxAlert.innerHTML = html;
+                        return;
+                    }
+
+                    accountAdminAjaxAlert.className = "alert-success";
+                    accountAdminAjaxAlert.innerHTML = "<div>" + (result.data.message || "Profile updated successfully.") + "</div>";
+
+                    if (result.data.profile) {
+                        var adminNameInput = document.getElementById("accountAdminName");
+                        var adminEmailInput = document.getElementById("accountAdminEmail");
+                        var adminPhoneInput = document.getElementById("accountAdminPhone");
+
+                        if (adminNameInput) {
+                            adminNameInput.value = result.data.profile.name || "";
+                        }
+                        if (adminEmailInput) {
+                            adminEmailInput.value = result.data.profile.email || "";
+                        }
+                        if (adminPhoneInput) {
+                            adminPhoneInput.value = result.data.profile.phonenumber || "";
+                        }
+                    }
+                })
+                .catch(function () {
+                    if (accountAdminAjaxAlert) {
+                        accountAdminAjaxAlert.className = "alert-error";
+                        accountAdminAjaxAlert.innerHTML = "<div>Failed to save profile.</div>";
+                    }
+                });
+        });
+    }
 
     if (systemLogoInput && systemLogoPreview) {
         systemLogoInput.addEventListener("change", function (event) {
@@ -814,6 +951,7 @@
         var treeStartScrollTop = 0;
         var treeMovedDistance = 0;
         var suppressTreeClick = false;
+        var treeNoDragSelector = ".member-card, .tree-see-more-btn, button, input, select, textarea, a, label";
 
         treeContainer.classList.add("is-pannable");
         treeContainer.style.touchAction = "none";
@@ -870,10 +1008,76 @@
             });
         }
 
+        function saveTreeAsImage() {
+            if (!treeCanvas || !window.html2canvas) {
+                window.alert("Save image is unavailable right now.");
+                return;
+            }
+
+            var previousLabel = saveTreeImageBtn ? saveTreeImageBtn.textContent : "";
+            var previousDisabled = saveTreeImageBtn ? saveTreeImageBtn.disabled : false;
+            var previousTreeTransform = treeCanvas.style.transform;
+            var previousTreeTransformOrigin = treeCanvas.style.transformOrigin;
+            var previousStageWidth = treeZoomStage ? treeZoomStage.style.width : "";
+            var previousStageHeight = treeZoomStage ? treeZoomStage.style.height : "";
+
+            if (saveTreeImageBtn) {
+                saveTreeImageBtn.disabled = true;
+                saveTreeImageBtn.textContent = "Saving...";
+            }
+
+            treeCanvas.style.transform = "none";
+            treeCanvas.style.transformOrigin = "top left";
+
+            if (treeZoomStage) {
+                treeZoomStage.style.width = Math.ceil(treeCanvas.offsetWidth) + "px";
+                treeZoomStage.style.height = Math.ceil(treeCanvas.offsetHeight) + "px";
+            }
+
+            window.html2canvas(treeCanvas, {
+                backgroundColor: "#f4f8fb",
+                scale: 2,
+                useCORS: true,
+                logging: false
+            })
+                .then(function (canvas) {
+                    var downloadLink = document.createElement("a");
+                    var dateTag = new Date().toISOString().slice(0, 10);
+                    downloadLink.href = canvas.toDataURL("image/png");
+                    downloadLink.download = "family-tree-" + dateTag + ".png";
+                    downloadLink.click();
+                })
+                .catch(function () {
+                    window.alert("Failed to save family tree image.");
+                })
+                .finally(function () {
+                    treeCanvas.style.transform = previousTreeTransform;
+                    treeCanvas.style.transformOrigin = previousTreeTransformOrigin;
+
+                    if (treeZoomStage) {
+                        treeZoomStage.style.width = previousStageWidth;
+                        treeZoomStage.style.height = previousStageHeight;
+                    }
+
+                    if (saveTreeImageBtn) {
+                        saveTreeImageBtn.disabled = previousDisabled;
+                        saveTreeImageBtn.textContent = previousLabel || "Save Image";
+                    }
+                });
+        }
+
+        if (saveTreeImageBtn) {
+            saveTreeImageBtn.addEventListener("click", saveTreeAsImage);
+        }
+
         window.addEventListener("resize", refreshTreeZoomSize);
 
         treeContainer.addEventListener("pointerdown", function (event) {
             if (event.pointerType === "mouse" && event.button !== 0) {
+                return;
+            }
+
+            if (event.target && event.target.closest(treeNoDragSelector)) {
                 return;
             }
 
@@ -1004,7 +1208,7 @@
                         detailEducation.textContent = familyMember.education_status || "-";
                     }
 
-                    if (familyMember.picture) {
+                    if (familyMember.picture && detailPhoto) {
                         detailPhoto.src = familyMember.picture;
 
                         var myCards = document.querySelectorAll('.member-card[data-isme="1"]');
@@ -1033,11 +1237,15 @@
         });
     }
 
-    if (!cards.length || !search || !detailName || !detailRole || !detailAge || !detailStatus || !detailPhoto) {
-        return;
-    }
+    var hasTreeMemberContext = Boolean(
+        cards.length && detailName && detailRole && detailAge && detailStatus && detailPhoto
+    );
 
     function syncDetailPhotoEditable() {
+        if (!detailPhoto) {
+            return;
+        }
+
         var isMe = detailPhoto.dataset.isme === "1";
         detailPhoto.classList.toggle("is-editable", isMe && Boolean(profilePictureInput));
         if (detailPhotoWrap) {
@@ -1077,6 +1285,58 @@
         }
     }
 
+    function syncMemberActionAccessBySelectedCard(card) {
+        if (!memberActionBlock || !card) {
+            return;
+        }
+
+        var memberId = card.dataset.memberid || "";
+        var lifeStatusRaw = (card.dataset.lifeStatusRaw || "").toLowerCase();
+        var canDeletePartner = (card.dataset.canDeletePartner || "0") === "1";
+        var canDeleteChild = (card.dataset.canDeleteChild || "0") === "1";
+        var canUpdateLifeStatus = (card.dataset.canUpdateLifeStatus || "0") === "1";
+        var showActionBlock = canDeletePartner || canDeleteChild || canUpdateLifeStatus;
+
+        memberActionBlock.classList.toggle("hidden", !showActionBlock);
+
+        if (deletePartnerForm) {
+            deletePartnerForm.classList.toggle("hidden", !canDeletePartner);
+        }
+
+        if (deleteChildForm) {
+            deleteChildForm.classList.toggle("hidden", !canDeleteChild);
+        }
+
+        if (lifeStatusForm) {
+            lifeStatusForm.classList.toggle("hidden", !canUpdateLifeStatus);
+        }
+
+        if (deletePartnerMemberIdInput) {
+            deletePartnerMemberIdInput.value = memberId;
+        }
+
+        if (deleteChildMemberIdInput) {
+            deleteChildMemberIdInput.value = memberId;
+        }
+
+        if (lifeStatusMemberIdInput) {
+            lifeStatusMemberIdInput.value = memberId;
+        }
+
+        if (lifeStatusSelect) {
+            if (lifeStatusRaw === "deceased") {
+                lifeStatusSelect.value = "deceased";
+            } else {
+                lifeStatusSelect.value = "alive";
+            }
+            lifeStatusSelect.disabled = !canUpdateLifeStatus;
+        }
+
+        if (saveLifeStatusBtn) {
+            saveLifeStatusBtn.disabled = !canUpdateLifeStatus;
+        }
+    }
+
     function setActive(card) {
         cards.forEach(function (item) {
             item.classList.remove("active");
@@ -1085,7 +1345,19 @@
         detailName.textContent = card.dataset.name || "-";
         detailRole.textContent = card.dataset.role || "-";
         detailAge.textContent = card.dataset.age || "-";
+        if (detailBirthdate) {
+            detailBirthdate.textContent = card.dataset.birthdate || "-";
+        }
+        if (detailBirthplace) {
+            detailBirthplace.textContent = card.dataset.birthplace || "-";
+        }
         detailStatus.textContent = card.dataset.status || "-";
+        if (detailPhone) {
+            detailPhone.textContent = card.dataset.phone || "-";
+        }
+        if (detailEmail) {
+            detailEmail.textContent = card.dataset.email || "-";
+        }
         if (detailJob) {
             detailJob.textContent = card.dataset.job || "-";
         }
@@ -1098,6 +1370,10 @@
         if (detailGeneration) {
             detailGeneration.textContent = card.dataset.generation || "-";
         }
+        var lifeStatusRaw = (card.dataset.lifeStatusRaw || "").toLowerCase();
+        if (detailCard) {
+            detailCard.classList.toggle("is-deceased", lifeStatusRaw === "deceased");
+        }
         var isMeCard = (card.dataset.isme || "0") === "1";
         detailPhoto.src = isMeCard && pendingCroppedPreviewUrl
             ? pendingCroppedPreviewUrl
@@ -1106,9 +1382,10 @@
         detailPhoto.dataset.isme = card.dataset.isme || "0";
         syncDetailPhotoEditable();
         syncAddMemberAccessBySelectedCard(card);
+        syncMemberActionAccessBySelectedCard(card);
     }
 
-    if (profilePictureInput) {
+    if (profilePictureInput && detailPhoto) {
         detailPhoto.addEventListener("click", function () {
             if (detailPhoto.dataset.isme !== "1") {
                 return;
@@ -1229,24 +1506,20 @@
         });
     }
 
-    cards.forEach(function (card) {
-        card.addEventListener("click", function () {
-            setActive(card);
-        });
-    });
-
-    var initialActiveCard = document.querySelector(".member-card.active");
-    if (initialActiveCard) {
-        syncAddMemberAccessBySelectedCard(initialActiveCard);
-    }
-
-    search.addEventListener("input", function (event) {
-        var keyword = event.target.value.trim().toLowerCase();
+    if (hasTreeMemberContext) {
         cards.forEach(function (card) {
-            var name = (card.dataset.name || "").toLowerCase();
-            var role = (card.dataset.role || "").toLowerCase();
-            var visible = name.indexOf(keyword) > -1 || role.indexOf(keyword) > -1;
-            card.style.display = visible ? "" : "none";
+            card.addEventListener("click", function () {
+                setSidePanel("profile");
+                setActive(card);
+            });
         });
-    });
+
+        var initialActiveCard = document.querySelector(".member-card.active");
+        if (initialActiveCard) {
+            syncAddMemberAccessBySelectedCard(initialActiveCard);
+            syncMemberActionAccessBySelectedCard(initialActiveCard);
+        }
+    } else {
+        syncDetailPhotoEditable();
+    }
 })();

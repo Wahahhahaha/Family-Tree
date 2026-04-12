@@ -3,10 +3,12 @@
 namespace App\Http\Controllers;
 
 use Carbon\Carbon;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -33,8 +35,11 @@ class Ctrl extends Controller
                 'fm.name',
                 'fm.gender',
                 'fm.birthdate',
+                'fm.birthplace',
                 'fm.life_status',
                 'fm.picture',
+                'fm.email',
+                'fm.phonenumber',
                 'fm.job',
                 'fm.address',
                 'fm.education_status'
@@ -109,6 +114,52 @@ class Ctrl extends Controller
         $currentMember = $familyMembers->firstWhere('userid', $currentUserId);
         $currentMemberId = (int) ($currentMember->memberid ?? 0);
         $currentMemberHasPartner = !empty($partnerMap[$currentMemberId] ?? []);
+        $canDeletePartnerMap = [];
+        $canDeleteChildMap = [];
+        $canUpdateLifeStatusMap = [];
+
+        if ($currentMemberId !== 0) {
+            $canUpdateLifeStatusMap[$currentMemberId] = true;
+
+            foreach ($relationships as $relation) {
+                $from = (int) $relation->memberid;
+                $to = (int) $relation->relatedmemberid;
+                $type = strtolower((string) $relation->relationtype);
+
+                if (!isset($membersById[$from]) || !isset($membersById[$to])) {
+                    continue;
+                }
+
+                if ($type === 'partner' && ($from === $currentMemberId || $to === $currentMemberId)) {
+                    $partnerId = $from === $currentMemberId ? $to : $from;
+                    $canDeletePartnerMap[$partnerId] = true;
+                    $canUpdateLifeStatusMap[$partnerId] = true;
+                }
+
+                if ($type === 'child' && $from === $currentMemberId) {
+                    $canDeleteChildMap[$to] = true;
+                    $canUpdateLifeStatusMap[$to] = true;
+                }
+            }
+
+            $currentParents = $parentMap[$currentMemberId] ?? [];
+            foreach ($currentParents as $parentId) {
+                $parentId = (int) $parentId;
+                if ($parentId !== 0 && isset($membersById[$parentId])) {
+                    $canUpdateLifeStatusMap[$parentId] = true;
+                }
+            }
+
+            foreach ($currentParents as $parentId) {
+                $parentId = (int) $parentId;
+                foreach ($childrenMap[$parentId] ?? [] as $siblingId) {
+                    $siblingId = (int) $siblingId;
+                    if ($siblingId !== 0 && $siblingId !== $currentMemberId && isset($membersById[$siblingId])) {
+                        $canUpdateLifeStatusMap[$siblingId] = true;
+                    }
+                }
+            }
+        }
 
         $relationLabels = [];
         $genderLabel = function (int $memberId, string $maleLabel, string $femaleLabel, string $fallback) use ($membersById): string {
@@ -247,6 +298,18 @@ class Ctrl extends Controller
                 }
             }
 
+            $myPartnerSiblings = [];
+            foreach ($partnerMap[$currentMemberId] ?? [] as $myPartnerId) {
+                foreach ($parentsOf((int) $myPartnerId) as $partnerParentId) {
+                    foreach ($childrenOf((int) $partnerParentId) as $partnerSiblingId) {
+                        $partnerSiblingId = (int) $partnerSiblingId;
+                        if ($partnerSiblingId !== (int) $myPartnerId && $partnerSiblingId !== $currentMemberId) {
+                            $myPartnerSiblings[$partnerSiblingId] = true;
+                        }
+                    }
+                }
+            }
+
             if (in_array($targetId, $partnerMap[$currentMemberId] ?? [], true)) {
                 $relationLabels[$targetId] = $genderLabel($targetId, 'Husband', 'Wife', 'Partner');
                 continue;
@@ -305,6 +368,9 @@ class Ctrl extends Controller
                     $isSiblingInLaw = true;
                     break;
                 }
+            }
+            if (!$isSiblingInLaw && isset($myPartnerSiblings[$targetId])) {
+                $isSiblingInLaw = true;
             }
             if ($isSiblingInLaw) {
                 $relationLabels[$targetId] = $genderLabel($targetId, 'Brother in law', 'Sister in law', 'Sibling in law');
@@ -395,6 +461,29 @@ class Ctrl extends Controller
                 continue;
             }
 
+            $isGrandChildSpouse = false;
+            foreach ($myGrandChildren as $grandChildId) {
+                if (in_array($targetId, $partnerMap[(int) $grandChildId] ?? [], true)) {
+                    $isGrandChildSpouse = true;
+                    break;
+                }
+            }
+            if ($isGrandChildSpouse) {
+                $relationLabels[$targetId] = $genderLabel($targetId, 'Grandson-in-law', 'Granddaughter-in-law', 'Grandchild-in-law');
+                continue;
+            }
+
+            $myGreatGrandChildren = [];
+            foreach ($myGrandChildren as $grandChildId) {
+                foreach ($childrenOf((int) $grandChildId) as $greatGrandChildId) {
+                    $myGreatGrandChildren[] = (int) $greatGrandChildId;
+                }
+            }
+            if (in_array($targetId, $myGreatGrandChildren, true)) {
+                $relationLabels[$targetId] = $genderLabel($targetId, 'Great Grandson', 'Great Granddaughter', 'Great Grandchild');
+                continue;
+            }
+
             $myParentSiblings = [];
             foreach ($myParents as $parentId) {
                 $grandParents = $parentsOf((int) $parentId);
@@ -461,6 +550,14 @@ class Ctrl extends Controller
                 if (in_array($targetId, $childrenOf((int) $siblingId), true)) {
                     $isNephewNiece = true;
                     break;
+                }
+            }
+            if (!$isNephewNiece) {
+                foreach (array_keys($myPartnerSiblings) as $partnerSiblingId) {
+                    if (in_array($targetId, $childrenOf((int) $partnerSiblingId), true)) {
+                        $isNephewNiece = true;
+                        break;
+                    }
                 }
             }
             if ($isNephewNiece) {
@@ -567,7 +664,17 @@ class Ctrl extends Controller
             ->select('userid', 'job', 'address', 'education_status')
             ->first();
 
-        echo view('all.home', compact('systemSettings', 'familyMembers', 'currentFamilyProfile', 'treeRoots', 'relationLabels', 'currentMemberHasPartner'));
+        echo view('all.home', compact(
+            'systemSettings',
+            'familyMembers',
+            'currentFamilyProfile',
+            'treeRoots',
+            'relationLabels',
+            'currentMemberHasPartner',
+            'canDeletePartnerMap',
+            'canDeleteChildMap',
+            'canUpdateLifeStatusMap'
+        ));
         echo view('all.footer');
     }
 
@@ -653,6 +760,10 @@ class Ctrl extends Controller
             'familyMember' => $familyMember,
         ]);
 
+        $this->logActivity($request, 'login', [
+            'target_userid' => (int) $user->userid,
+            'target_username' => (string) $user->username,
+        ]);
 
         return redirect('/');
     }
@@ -670,6 +781,22 @@ class Ctrl extends Controller
             'pageClass' => 'page-login',
         ]);
         echo view('all.forgot-password', compact('systemSettings'));
+        echo view('all.footer');
+    }
+
+    public function forgotPasswordPhone(Request $request)
+    {
+        if ($request->session()->has('authenticated_user')) {
+            return redirect('/');
+        }
+
+        $systemSettings = $this->getSystemSettings();
+
+        echo view('all.header', [
+            'pageTitle' => 'Forgot Password by Phone | ' . $systemSettings['website_name'],
+            'pageClass' => 'page-login',
+        ]);
+        echo view('all.forgot-password-phone', compact('systemSettings'));
         echo view('all.footer');
     }
 
@@ -734,6 +861,183 @@ class Ctrl extends Controller
             'status',
             'A password reset link has been sent to your email.'
         );
+    }
+
+    public function sendPhoneResetOtp(Request $request)
+    {
+        $validated = $request->validate([
+            'phone_number' => ['required', 'string', 'max:30'],
+        ], [
+            'phone_number.required' => 'Phone number is required.',
+        ]);
+
+        $account = $this->findAccountByPhoneNumber((string) $validated['phone_number']);
+        if (!$account) {
+            return back()->withErrors([
+                'phone_number' => 'Phone number is not registered in the system.',
+            ])->withInput();
+        }
+
+        $otp = (string) random_int(100000, 999999);
+        $otpExpiresAt = Carbon::now()->addMinutes(5);
+
+        if (!$this->sendWhatsappOtpViaFonnte((string) $account->phone_number, $otp, $otpExpiresAt)) {
+            return back()->withErrors([
+                'phone_number' => 'Failed to send OTP to WhatsApp. Please try again later.',
+            ])->withInput();
+        }
+
+        $request->session()->put('phone_password_reset', [
+            'userid' => (int) $account->userid,
+            'phone_number' => (string) $account->phone_number,
+            'phone_display' => trim((string) $validated['phone_number']),
+            'otp_hash' => Hash::make($otp),
+            'otp_expires_at' => $otpExpiresAt->toDateTimeString(),
+        ]);
+
+        $request->session()->forget('phone_password_reset_verified');
+
+        return redirect('/forgot-password/phone')
+            ->with('phone_otp_sent', true)
+            ->with('show_phone_otp_form', true)
+            ->with('phone_status', 'An OTP code has been sent to your WhatsApp number.');
+    }
+
+    public function verifyPhoneResetOtp(Request $request)
+    {
+        $validated = $request->validate([
+            'phone_number' => ['required', 'string', 'max:30'],
+            'otp' => ['required', 'digits:6'],
+        ], [
+            'phone_number.required' => 'Phone number is required.',
+            'otp.required' => 'OTP is required.',
+            'otp.digits' => 'OTP must contain 6 digits.',
+        ]);
+
+        $sessionReset = $request->session()->get('phone_password_reset');
+        if (!is_array($sessionReset)) {
+            return redirect('/forgot-password/phone')->withErrors([
+                'otp' => 'OTP session not found. Please request a new OTP.',
+            ]);
+        }
+
+        $inputPhone = $this->normalizePhoneNumber((string) $validated['phone_number']);
+        $storedPhone = $this->normalizePhoneNumber((string) ($sessionReset['phone_number'] ?? ''));
+        if ($inputPhone === '' || $storedPhone === '' || $inputPhone !== $storedPhone) {
+            return back()->withErrors([
+                'phone_number' => 'The phone number does not match the OTP request.',
+            ])->with('show_phone_otp_form', true)->withInput();
+        }
+
+        $otpExpiresAtRaw = (string) ($sessionReset['otp_expires_at'] ?? '');
+        $otpExpiresAt = $otpExpiresAtRaw !== '' ? Carbon::parse($otpExpiresAtRaw) : null;
+        if (!$otpExpiresAt || $otpExpiresAt->isPast()) {
+            $request->session()->forget('phone_password_reset');
+
+            return redirect('/forgot-password/phone')->withErrors([
+                'otp' => 'OTP has expired. Please request a new OTP.',
+            ]);
+        }
+
+        $storedOtpHash = (string) ($sessionReset['otp_hash'] ?? '');
+        if ($storedOtpHash === '' || !Hash::check((string) $validated['otp'], $storedOtpHash)) {
+            return back()->withErrors([
+                'otp' => 'Invalid OTP code.',
+            ])->with('show_phone_otp_form', true)->withInput();
+        }
+
+        $request->session()->put('phone_password_reset_verified', [
+            'userid' => (int) ($sessionReset['userid'] ?? 0),
+            'phone_number' => (string) ($sessionReset['phone_number'] ?? ''),
+            'verified_expires_at' => Carbon::now()->addMinutes(15)->toDateTimeString(),
+        ]);
+
+        $request->session()->forget('phone_password_reset');
+
+        return redirect('/reset-password/phone');
+    }
+
+    public function resetPasswordPhoneForm(Request $request)
+    {
+        if ($request->session()->has('authenticated_user')) {
+            return redirect('/');
+        }
+
+        $verified = $request->session()->get('phone_password_reset_verified');
+        if (!is_array($verified)) {
+            return redirect('/forgot-password/phone')->withErrors([
+                'phone_number' => 'Phone verification is required before resetting your password.',
+            ]);
+        }
+
+        $expiresAtRaw = (string) ($verified['verified_expires_at'] ?? '');
+        $expiresAt = $expiresAtRaw !== '' ? Carbon::parse($expiresAtRaw) : null;
+        if (!$expiresAt || $expiresAt->isPast()) {
+            $request->session()->forget('phone_password_reset_verified');
+
+            return redirect('/forgot-password/phone')->withErrors([
+                'phone_number' => 'Your verification session has expired. Please restart from phone OTP.',
+            ]);
+        }
+
+        $systemSettings = $this->getSystemSettings();
+
+        echo view('all.header', [
+            'pageTitle' => 'Reset Password by Phone | ' . $systemSettings['website_name'],
+            'pageClass' => 'page-login',
+        ]);
+        echo view('all.reset-password-phone', compact('systemSettings'));
+        echo view('all.footer');
+    }
+
+    public function updatePasswordByPhone(Request $request)
+    {
+        $validated = $request->validate([
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ], [
+            'password.required' => 'New password is required.',
+            'password.min' => 'New password must be at least 8 characters.',
+            'password.confirmed' => 'Password confirmation does not match.',
+        ]);
+
+        $verified = $request->session()->get('phone_password_reset_verified');
+        if (!is_array($verified)) {
+            return redirect('/forgot-password/phone')->withErrors([
+                'phone_number' => 'Phone verification is required before resetting your password.',
+            ]);
+        }
+
+        $expiresAtRaw = (string) ($verified['verified_expires_at'] ?? '');
+        $expiresAt = $expiresAtRaw !== '' ? Carbon::parse($expiresAtRaw) : null;
+        if (!$expiresAt || $expiresAt->isPast()) {
+            $request->session()->forget('phone_password_reset_verified');
+
+            return redirect('/forgot-password/phone')->withErrors([
+                'phone_number' => 'Your verification session has expired. Please restart from phone OTP.',
+            ]);
+        }
+
+        $userId = (int) ($verified['userid'] ?? 0);
+        $accountExists = DB::table('user')->where('userid', $userId)->exists();
+        if (!$accountExists) {
+            $request->session()->forget('phone_password_reset_verified');
+
+            return redirect('/forgot-password/phone')->withErrors([
+                'phone_number' => 'User account is not found. Please contact administrator.',
+            ]);
+        }
+
+        DB::table('user')
+            ->where('userid', $userId)
+            ->update([
+                'password' => Hash::make((string) $validated['password']),
+                'reset_password_token' => null,
+                'reset_password_token_expired' => null,
+            ]);
+
+        $request->session()->forget('phone_password_reset_verified');
+
+        return redirect('/password-reset/success')->with('password_reset_success', true);
     }
 
     public function resetPasswordForm(Request $request, string $token)
@@ -877,6 +1181,8 @@ class Ctrl extends Controller
 
     public function logout(Request $request)
     {
+        $this->logActivity($request, 'logout');
+
         $request->session()->forget('authenticated_user');
         $request->session()->invalidate();
         $request->session()->regenerateToken();
@@ -892,14 +1198,116 @@ class Ctrl extends Controller
         }
 
         $systemSettings = $this->getSystemSettings();
+        $currentUserId = (int) session('authenticated_user.userid');
+        $currentLevelId = (int) session('authenticated_user.levelid');
+        $currentRoleId = (int) session('authenticated_user.roleid');
+        $currentFamilyProfile = DB::table('family_member')
+            ->where('userid', $currentUserId)
+            ->first();
+        $currentEmployerProfile = DB::table('employer')
+            ->where('userid', $currentUserId)
+            ->first();
+        $canEditOwnProfile = $currentLevelId === 2 && !empty($currentFamilyProfile);
+        $canEditAdminProfile = in_array($currentRoleId, [1, 2], true) && !empty($currentEmployerProfile);
 
 
         echo view('all.header', [
             'pageTitle' => 'Account | ' . $systemSettings['website_name'],
             'pageClass' => 'page-family-tree',
         ]);
-        echo view('all.account', compact('systemSettings'));
+        echo view('all.account', compact(
+            'systemSettings',
+            'currentFamilyProfile',
+            'currentEmployerProfile',
+            'canEditOwnProfile',
+            'canEditAdminProfile'
+        ));
         echo view('all.footer');
+    }
+
+    public function updateEmployerProfile(Request $request)
+    {
+        if (!$request->session()->has('authenticated_user')) {
+            if ($request->ajax() || $request->expectsJson()) {
+                return response()->json(['message' => 'Unauthenticated.'], 401);
+            }
+
+            return redirect('/login');
+        }
+
+        $currentUserId = (int) session('authenticated_user.userid');
+        $currentRoleId = (int) session('authenticated_user.roleid');
+
+        if (!in_array($currentRoleId, [1, 2], true)) {
+            if ($request->ajax() || $request->expectsJson()) {
+                return response()->json(['message' => 'Only admin can update this profile.'], 403);
+            }
+
+            return redirect('/account')->with('error', 'Only admin can update this profile.');
+        }
+
+        $employer = DB::table('employer')
+            ->where('userid', $currentUserId)
+            ->first();
+
+        if (!$employer) {
+            if ($request->ajax() || $request->expectsJson()) {
+                return response()->json(['message' => 'Admin profile not found.'], 404);
+            }
+
+            return redirect('/account')->with('error', 'Admin profile not found.');
+        }
+
+        $validator = Validator::make($request->all(), [
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', 'max:255'],
+            'phonenumber' => ['required', 'string', 'max:255'],
+        ], [
+            'name.required' => 'Name is required.',
+            'email.required' => 'Email is required.',
+            'email.email' => 'Email format is invalid.',
+            'phonenumber.required' => 'Phone number is required.',
+        ]);
+
+        if ($validator->fails()) {
+            if ($request->ajax() || $request->expectsJson()) {
+                return response()->json([
+                    'message' => 'Validation failed.',
+                    'errors' => $validator->errors(),
+                ], 422);
+            }
+
+            return redirect('/account')
+                ->withErrors($validator)
+                ->withInput();
+        }
+
+        $validated = $validator->validated();
+
+        DB::table('employer')
+            ->where('userid', $currentUserId)
+            ->update([
+                'name' => trim((string) $validated['name']),
+                'email' => strtolower(trim((string) $validated['email'])),
+                'phonenumber' => trim((string) $validated['phonenumber']),
+            ]);
+
+        $this->logActivity($request, 'account.update_admin_profile', [
+            'userid' => $currentUserId,
+        ]);
+
+        if ($request->ajax() || $request->expectsJson()) {
+            return response()->json([
+                'message' => 'Profile updated successfully.',
+                'profile' => [
+                    'name' => trim((string) $validated['name']),
+                    'email' => strtolower(trim((string) $validated['email'])),
+                    'phonenumber' => trim((string) $validated['phonenumber']),
+                ],
+            ]);
+        }
+
+        return redirect('/account')->with('success', 'Profile updated successfully.');
     }
 
     public function userManagement(Request $request)
@@ -921,7 +1329,8 @@ class Ctrl extends Controller
             $usersQuery->where('u.levelid', 2);
         }
 
-        $users = $usersQuery->paginate(20)->withQueryString();
+        $perPage = 20;
+        $users = $usersQuery->paginate($perPage)->withQueryString();
 
         $levels = DB::table('level')
             ->selectRaw('MIN(levelid) as levelid, levelname')
@@ -960,6 +1369,71 @@ class Ctrl extends Controller
             'pageClass' => 'page-family-tree',
         ]);
         echo view('admin.user-management', compact('users', 'levels', 'roles', 'systemSettings'));
+        echo view('all.footer');
+    }
+
+    public function activityLog(Request $request)
+    {
+        if (!$request->session()->has('authenticated_user')) {
+            return redirect('/login');
+        }
+
+        if ((int) session('authenticated_user.roleid') !== 1) {
+            return redirect('/management/users')->with('error', 'Only superadmin can access activity log.');
+        }
+
+        $systemSettings = $this->getSystemSettings();
+        $perPage = 20;
+        $allActivityLogs = collect($this->readActivityLogs(null))->values();
+        $currentPage = max(1, (int) $request->query('page', 1));
+        $currentPageItems = $allActivityLogs->forPage($currentPage, $perPage)->values();
+
+        $activityLogs = new LengthAwarePaginator(
+            $currentPageItems,
+            $allActivityLogs->count(),
+            $perPage,
+            $currentPage,
+            [
+                'path' => $request->url(),
+                'query' => $request->query(),
+            ]
+        );
+
+        if ($request->ajax() || $request->expectsJson() || $request->query('ajax') === '1') {
+            return response()->json([
+                'rows_html' => view('admin.partials.activity-log-table-rows', ['activityLogs' => $activityLogs])->render(),
+                'pagination_html' => view('admin.partials.activity-log-pagination', ['activityLogs' => $activityLogs])->render(),
+                'total' => $activityLogs->total(),
+                'current_page' => $activityLogs->currentPage(),
+                'last_page' => $activityLogs->lastPage(),
+            ]);
+        }
+
+        echo view('all.header', [
+            'pageTitle' => 'Activity Log',
+            'pageClass' => 'page-family-tree',
+        ]);
+        echo view('admin.activity-log', compact('systemSettings', 'activityLogs'));
+        echo view('all.footer');
+    }
+
+    public function recycleBin(Request $request)
+    {
+        if (!$request->session()->has('authenticated_user')) {
+            return redirect('/login');
+        }
+
+        if ((int) session('authenticated_user.roleid') !== 1) {
+            return redirect('/management/users')->with('error', 'Only superadmin can access recycle bin.');
+        }
+
+        $systemSettings = $this->getSystemSettings();
+
+        echo view('all.header', [
+            'pageTitle' => 'Recycle Bin',
+            'pageClass' => 'page-family-tree',
+        ]);
+        echo view('superadmin.recycle-bin', compact('systemSettings'));
         echo view('all.footer');
     }
 
@@ -1175,6 +1649,12 @@ class Ctrl extends Controller
             }
         });
 
+        $this->logActivity($request, 'management.create_user', [
+            'username' => (string) $validated['username'],
+            'levelid' => (int) $validated['levelid'],
+            'roleid' => isset($validated['roleid']) ? (int) $validated['roleid'] : null,
+        ]);
+
         if ($request->ajax() || $request->expectsJson()) {
             return response()->json([
                 'message' => 'New user has been added.',
@@ -1203,6 +1683,11 @@ class Ctrl extends Controller
             ->update([
                 'password' => Hash::make($user->username),
             ]);
+
+        $this->logActivity($request, 'management.reset_password', [
+            'target_userid' => (int) $userid,
+            'target_username' => (string) $user->username,
+        ]);
 
         return redirect('/management/users')->with(
             'success',
@@ -1250,11 +1735,21 @@ class Ctrl extends Controller
             DB::table('user')->where('userid', $targetUserId)->delete();
         });
 
+        $this->logActivity($request, 'management.delete_user', [
+            'target_userid' => $targetUserId,
+            'target_username' => (string) ($user->username ?? ''),
+        ]);
+
         return redirect('/management/users')->with('success', 'User has been deleted.');
     }
 
     public function updateFamilyProfile(Request $request)
     {
+        $redirectTo = (string) $request->input('redirect_to', '/');
+        if (!in_array($redirectTo, ['/', '/account'], true)) {
+            $redirectTo = '/';
+        }
+
         if (!$request->session()->has('authenticated_user')) {
             if ($request->ajax() || $request->expectsJson()) {
                 return response()->json(['message' => 'Unauthenticated.'], 401);
@@ -1271,7 +1766,7 @@ class Ctrl extends Controller
                 return response()->json(['message' => 'Only family members can update this profile.'], 403);
             }
 
-            return redirect('/')->with('error', 'Only family members can update this profile.');
+            return redirect($redirectTo)->with('error', 'Only family members can update this profile.');
         }
 
         $familyMember = DB::table('family_member')
@@ -1283,7 +1778,7 @@ class Ctrl extends Controller
                 return response()->json(['message' => 'Family profile not found.'], 404);
             }
 
-            return redirect('/')->with('error', 'Family profile not found.');
+            return redirect($redirectTo)->with('error', 'Family profile not found.');
         }
 
         $validated = $request->validate([
@@ -1332,6 +1827,12 @@ class Ctrl extends Controller
             ->select('job', 'address', 'education_status', 'picture')
             ->first();
 
+        $this->logActivity($request, 'family.edit_profile', [
+            'userid' => $currentUserId,
+            'has_picture_upload' => $request->hasFile('picture'),
+            'redirect_to' => $redirectTo,
+        ]);
+
         if ($request->ajax() || $request->expectsJson()) {
             return response()->json([
                 'message' => 'Profile details updated successfully.',
@@ -1339,7 +1840,7 @@ class Ctrl extends Controller
             ]);
         }
 
-        return redirect('/')->with('success', 'Profile details updated successfully.');
+        return redirect($redirectTo)->with('success', 'Profile details updated successfully.');
     }
 
     public function storeFamilyMemberFromHome(Request $request)
@@ -1429,12 +1930,16 @@ class Ctrl extends Controller
             $partnerMemberId = (int) $partnerIds->first();
         }
 
-        DB::transaction(function () use ($validated, $targetMemberId, $relationType, $childParentingMode, $partnerMemberId, $newMemberMaritalStatus) {
+        $createdUserId = 0;
+        $createdMemberId = 0;
+
+        DB::transaction(function () use ($validated, $targetMemberId, $relationType, $childParentingMode, $partnerMemberId, $newMemberMaritalStatus, &$createdUserId, &$createdMemberId) {
             $userId = DB::table('user')->insertGetId([
                 'username' => $validated['username'],
                 'password' => Hash::make($validated['username']),
                 'levelid' => 2,
             ]);
+            $createdUserId = (int) $userId;
 
             $picture = $validated['gender'] === 'male'
                 ? '/images/avatar-male.svg'
@@ -1456,6 +1961,7 @@ class Ctrl extends Controller
                 'picture' => $picture,
                 'userid' => $userId,
             ]);
+            $createdMemberId = (int) $newMemberId;
 
             $expectedRelationCount = 0;
             if ($relationType === 'child') {
@@ -1514,7 +2020,281 @@ class Ctrl extends Controller
             }
         });
 
+        $this->logActivity($request, 'family.add_relationship', [
+            'target_memberid' => $targetMemberId,
+            'new_memberid' => $createdMemberId,
+            'new_userid' => $createdUserId,
+            'new_username' => (string) $validated['username'],
+            'new_member_name' => (string) $validated['name'],
+            'new_member_gender' => (string) $validated['gender'],
+            'relation_type' => $relationType,
+            'child_parenting_mode' => $relationType === 'child' ? $childParentingMode : null,
+            'partner_memberid' => $partnerMemberId,
+        ]);
+
         return redirect('/')->with('success', 'New family member has been added.');
+    }
+
+    public function deleteFamilyMemberFromHome(Request $request)
+    {
+        if (!$request->session()->has('authenticated_user')) {
+            return redirect('/login');
+        }
+
+        $currentLevelId = (int) session('authenticated_user.levelid');
+        if ($currentLevelId !== 2) {
+            return redirect('/')->with('error', 'Only family members can delete partner or child data.');
+        }
+
+        $currentUserId = (int) session('authenticated_user.userid');
+        $currentMember = DB::table('family_member')
+            ->where('userid', $currentUserId)
+            ->select('memberid')
+            ->first();
+
+        if (!$currentMember) {
+            return redirect('/')->with('error', 'Current family profile was not found.');
+        }
+
+        $validated = $request->validate([
+            'memberid' => ['required', 'integer', 'exists:family_member,memberid'],
+        ], [
+            'memberid.required' => 'Member target is required.',
+            'memberid.exists' => 'Selected member is not found.',
+        ]);
+
+        $currentMemberId = (int) $currentMember->memberid;
+        $targetMemberId = (int) $validated['memberid'];
+
+        if ($targetMemberId === $currentMemberId) {
+            return redirect('/')->with('error', 'You cannot delete your own account from this action.');
+        }
+
+        $targetMember = DB::table('family_member')
+            ->where('memberid', $targetMemberId)
+            ->select('memberid', 'userid', 'name', 'gender', 'picture')
+            ->first();
+
+        if (!$targetMember) {
+            return redirect('/')->with('error', 'Selected member is not found.');
+        }
+
+        $hasPartnerRelation = DB::table('relationship')
+            ->where('relationtype', 'partner')
+            ->where(function ($query) use ($currentMemberId, $targetMemberId) {
+                $query->where(function ($subQuery) use ($currentMemberId, $targetMemberId) {
+                    $subQuery->where('memberid', $currentMemberId)
+                        ->where('relatedmemberid', $targetMemberId);
+                })->orWhere(function ($subQuery) use ($currentMemberId, $targetMemberId) {
+                    $subQuery->where('memberid', $targetMemberId)
+                        ->where('relatedmemberid', $currentMemberId);
+                });
+            })
+            ->exists();
+
+        $hasChildRelation = DB::table('relationship')
+            ->where('relationtype', 'child')
+            ->where('memberid', $currentMemberId)
+            ->where('relatedmemberid', $targetMemberId)
+            ->exists();
+
+        if (!$hasPartnerRelation && !$hasChildRelation) {
+            return redirect('/')->with('error', 'You can only delete your own partner or child.');
+        }
+
+        DB::transaction(function () use ($targetMember, $targetMemberId, $hasPartnerRelation, $currentMemberId) {
+            DB::table('relationship')
+                ->where('memberid', $targetMemberId)
+                ->orWhere('relatedmemberid', $targetMemberId)
+                ->delete();
+
+            DB::table('family_member')
+                ->where('memberid', $targetMemberId)
+                ->delete();
+
+            DB::table('employer')
+                ->where('userid', (int) $targetMember->userid)
+                ->delete();
+
+            DB::table('user')
+                ->where('userid', (int) $targetMember->userid)
+                ->delete();
+
+            if ($hasPartnerRelation) {
+                $remainingPartnerCount = DB::table('relationship')
+                    ->where('relationtype', 'partner')
+                    ->where(function ($query) use ($currentMemberId) {
+                        $query->where('memberid', $currentMemberId)
+                            ->orWhere('relatedmemberid', $currentMemberId);
+                    })
+                    ->count();
+
+                if ($remainingPartnerCount === 0) {
+                    DB::table('family_member')
+                        ->where('memberid', $currentMemberId)
+                        ->update(['marital_status' => 'single']);
+                }
+            }
+        });
+
+        if (!empty($targetMember->picture) && str_starts_with((string) $targetMember->picture, '/uploads/family/')) {
+            $picturePath = public_path(ltrim((string) $targetMember->picture, '/'));
+            if (File::exists($picturePath)) {
+                File::delete($picturePath);
+            }
+        }
+
+        $this->logActivity($request, 'family.delete_relationship', [
+            'target_memberid' => $targetMemberId,
+            'target_userid' => (int) ($targetMember->userid ?? 0),
+            'target_name' => (string) ($targetMember->name ?? ''),
+            'target_gender' => (string) ($targetMember->gender ?? ''),
+            'relation_deleted' => $hasPartnerRelation ? 'partner' : 'child',
+        ]);
+
+        return redirect('/')->with('success', 'Family member has been deleted.');
+    }
+
+    public function updateFamilyMemberLifeStatus(Request $request)
+    {
+        if (!$request->session()->has('authenticated_user')) {
+            return redirect('/login');
+        }
+
+        $currentLevelId = (int) session('authenticated_user.levelid');
+        if ($currentLevelId !== 2) {
+            return redirect('/')->with('error', 'Only family members can update life status.');
+        }
+
+        $currentUserId = (int) session('authenticated_user.userid');
+        $currentMember = DB::table('family_member')
+            ->where('userid', $currentUserId)
+            ->select('memberid')
+            ->first();
+
+        if (!$currentMember) {
+            return redirect('/')->with('error', 'Current family profile was not found.');
+        }
+
+        $validated = $request->validate([
+            'memberid' => ['required', 'integer', 'exists:family_member,memberid'],
+            'life_status' => ['required', 'string', 'in:alive,deceased'],
+        ], [
+            'memberid.required' => 'Member target is required.',
+            'memberid.exists' => 'Selected member is not found.',
+            'life_status.required' => 'Life status is required.',
+            'life_status.in' => 'Life status must be alive or deceased.',
+        ]);
+
+        $currentMemberId = (int) $currentMember->memberid;
+        $targetMemberId = (int) $validated['memberid'];
+
+        $partnerIds = DB::table('relationship')
+            ->where('relationtype', 'partner')
+            ->where(function ($query) use ($currentMemberId) {
+                $query->where('memberid', $currentMemberId)
+                    ->orWhere('relatedmemberid', $currentMemberId);
+            })
+            ->get()
+            ->map(function ($row) use ($currentMemberId) {
+                return (int) ((int) $row->memberid === $currentMemberId
+                    ? $row->relatedmemberid
+                    : $row->memberid);
+            })
+            ->filter(function ($id) {
+                return (int) $id !== 0;
+            })
+            ->unique()
+            ->values()
+            ->all();
+
+        $childIds = DB::table('relationship')
+            ->where('relationtype', 'child')
+            ->where('memberid', $currentMemberId)
+            ->pluck('relatedmemberid')
+            ->map(function ($id) {
+                return (int) $id;
+            })
+            ->filter(function ($id) {
+                return $id !== 0;
+            })
+            ->unique()
+            ->values()
+            ->all();
+
+        $parentIds = DB::table('relationship')
+            ->where('relationtype', 'child')
+            ->where('relatedmemberid', $currentMemberId)
+            ->pluck('memberid')
+            ->map(function ($id) {
+                return (int) $id;
+            })
+            ->filter(function ($id) {
+                return $id !== 0;
+            })
+            ->unique()
+            ->values()
+            ->all();
+
+        $siblingIds = [];
+        if (!empty($parentIds)) {
+            $siblingIds = DB::table('relationship')
+                ->where('relationtype', 'child')
+                ->whereIn('memberid', $parentIds)
+                ->where('relatedmemberid', '!=', $currentMemberId)
+                ->pluck('relatedmemberid')
+                ->map(function ($id) {
+                    return (int) $id;
+                })
+                ->filter(function ($id) {
+                    return $id !== 0;
+                })
+                ->unique()
+                ->values()
+                ->all();
+        }
+
+        $allowedMemberIds = [];
+        $allowedMemberIds[$currentMemberId] = true;
+        foreach ($partnerIds as $id) {
+            $allowedMemberIds[(int) $id] = true;
+        }
+        foreach ($childIds as $id) {
+            $allowedMemberIds[(int) $id] = true;
+        }
+        foreach ($parentIds as $id) {
+            $allowedMemberIds[(int) $id] = true;
+        }
+        foreach ($siblingIds as $id) {
+            $allowedMemberIds[(int) $id] = true;
+        }
+
+        if (empty($allowedMemberIds[$targetMemberId])) {
+            return redirect('/')->with('error', 'You can only update life status for yourself, partner, child, parent, or sibling.');
+        }
+
+        $targetMember = DB::table('family_member')
+            ->where('memberid', $targetMemberId)
+            ->select('name', 'gender')
+            ->first();
+
+        $nextLifeStatus = (string) $validated['life_status'];
+        DB::table('family_member')
+            ->where('memberid', $targetMemberId)
+            ->update([
+                'life_status' => $nextLifeStatus,
+                'deaddate' => $nextLifeStatus === 'deceased' ? now()->toDateString() : null,
+            ]);
+
+        $this->logActivity($request, 'family.update_life_status', [
+            'target_memberid' => $targetMemberId,
+            'target_name' => (string) ($targetMember->name ?? ''),
+            'target_gender' => (string) ($targetMember->gender ?? ''),
+            'target_relation_label' => $this->resolveActivityRelationLabel($currentMemberId, $targetMemberId),
+            'life_status' => $nextLifeStatus,
+        ]);
+
+        return redirect('/')->with('success', 'Life status has been updated.');
     }
 
     public function systemSetting(Request $request)
@@ -1587,6 +2367,11 @@ class Ctrl extends Controller
 
         $this->saveSystemSettings($settings);
 
+        $this->logActivity($request, 'superadmin.update_setting', [
+            'website_name' => (string) $settings['website_name'],
+            'has_logo' => !empty($settings['logo_path']),
+        ]);
+
         if ($request->ajax() || $request->expectsJson()) {
             return response()->json([
                 'message' => 'System settings updated successfully.',
@@ -1595,6 +2380,92 @@ class Ctrl extends Controller
         }
 
         return redirect('/setting')->with('success', 'System settings updated successfully.');
+    }
+
+    private function findAccountByPhoneNumber(string $inputPhone): ?object
+    {
+        $normalizedInput = $this->normalizePhoneNumber($inputPhone);
+        if ($normalizedInput === '') {
+            return null;
+        }
+
+        $accounts = DB::table('user as u')
+            ->leftJoin('family_member as fm', 'fm.userid', '=', 'u.userid')
+            ->leftJoin('employer as e', 'e.userid', '=', 'u.userid')
+            ->select('u.userid', 'fm.phonenumber as family_phone', 'e.phonenumber as employer_phone')
+            ->get();
+
+        foreach ($accounts as $account) {
+            $familyPhone = $this->normalizePhoneNumber((string) ($account->family_phone ?? ''));
+            if ($familyPhone !== '' && $familyPhone === $normalizedInput) {
+                return (object) [
+                    'userid' => (int) $account->userid,
+                    'phone_number' => $familyPhone,
+                ];
+            }
+
+            $employerPhone = $this->normalizePhoneNumber((string) ($account->employer_phone ?? ''));
+            if ($employerPhone !== '' && $employerPhone === $normalizedInput) {
+                return (object) [
+                    'userid' => (int) $account->userid,
+                    'phone_number' => $employerPhone,
+                ];
+            }
+        }
+
+        return null;
+    }
+
+    private function normalizePhoneNumber(string $phoneNumber): string
+    {
+        $digits = preg_replace('/\D+/', '', trim($phoneNumber));
+        if (!is_string($digits) || $digits === '') {
+            return '';
+        }
+
+        if (str_starts_with($digits, '0')) {
+            return '62' . substr($digits, 1);
+        }
+
+        if (str_starts_with($digits, '8')) {
+            return '62' . $digits;
+        }
+
+        return $digits;
+    }
+
+    private function sendWhatsappOtpViaFonnte(string $phoneNumber, string $otp, Carbon $expiresAt): bool
+    {
+        $token = (string) config('services.fonnte.token', '');
+        if ($token === '') {
+            return false;
+        }
+
+        $url = (string) config('services.fonnte.url', 'https://api.fonnte.com/send');
+        $message = 'Your password reset OTP is: ' . $otp . '. This code expires at '
+            . $expiresAt->format('Y-m-d H:i:s') . ' (server time).';
+
+        try {
+            $response = Http::withHeaders([
+                'Authorization' => $token,
+            ])->asForm()->post($url, [
+                'target' => $phoneNumber,
+                'message' => $message,
+            ]);
+
+            if (!$response->successful()) {
+                return false;
+            }
+
+            $payload = $response->json();
+            if (is_array($payload) && array_key_exists('status', $payload)) {
+                return (bool) $payload['status'];
+            }
+
+            return true;
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 
     private function usersQuery()
@@ -1619,6 +2490,176 @@ class Ctrl extends Controller
                 END as source")
             )
             ->orderBy('u.userid');
+    }
+
+    private function resolveActivityRelationLabel(int $sourceMemberId, int $targetMemberId): string
+    {
+        if ($sourceMemberId === 0 || $targetMemberId === 0) {
+            return 'Member';
+        }
+
+        if ($sourceMemberId === $targetMemberId) {
+            return 'Self';
+        }
+
+        $targetGender = strtolower((string) DB::table('family_member')
+            ->where('memberid', $targetMemberId)
+            ->value('gender'));
+
+        $partnerExists = DB::table('relationship')
+            ->where('relationtype', 'partner')
+            ->where(function ($query) use ($sourceMemberId, $targetMemberId) {
+                $query->where(function ($subQuery) use ($sourceMemberId, $targetMemberId) {
+                    $subQuery->where('memberid', $sourceMemberId)
+                        ->where('relatedmemberid', $targetMemberId);
+                })->orWhere(function ($subQuery) use ($sourceMemberId, $targetMemberId) {
+                    $subQuery->where('memberid', $targetMemberId)
+                        ->where('relatedmemberid', $sourceMemberId);
+                });
+            })
+            ->exists();
+
+        if ($partnerExists) {
+            if ($targetGender === 'female') {
+                return 'Wife';
+            }
+            if ($targetGender === 'male') {
+                return 'Husband';
+            }
+            return 'Partner';
+        }
+
+        $isChild = DB::table('relationship')
+            ->where('relationtype', 'child')
+            ->where('memberid', $sourceMemberId)
+            ->where('relatedmemberid', $targetMemberId)
+            ->exists();
+
+        if ($isChild) {
+            if ($targetGender === 'female') {
+                return 'Daughter';
+            }
+            if ($targetGender === 'male') {
+                return 'Son';
+            }
+            return 'Child';
+        }
+
+        $isParent = DB::table('relationship')
+            ->where('relationtype', 'child')
+            ->where('memberid', $targetMemberId)
+            ->where('relatedmemberid', $sourceMemberId)
+            ->exists();
+
+        if ($isParent) {
+            if ($targetGender === 'female') {
+                return 'Mother';
+            }
+            if ($targetGender === 'male') {
+                return 'Father';
+            }
+            return 'Parent';
+        }
+
+        $parentIds = DB::table('relationship')
+            ->where('relationtype', 'child')
+            ->where('relatedmemberid', $sourceMemberId)
+            ->pluck('memberid')
+            ->map(function ($id) {
+                return (int) $id;
+            })
+            ->filter(function ($id) {
+                return $id !== 0;
+            })
+            ->unique()
+            ->values()
+            ->all();
+
+        if (!empty($parentIds)) {
+            $isSibling = DB::table('relationship')
+                ->where('relationtype', 'child')
+                ->whereIn('memberid', $parentIds)
+                ->where('relatedmemberid', $targetMemberId)
+                ->exists();
+
+            if ($isSibling) {
+                if ($targetGender === 'female') {
+                    return 'Sister';
+                }
+                if ($targetGender === 'male') {
+                    return 'Brother';
+                }
+                return 'Sibling';
+            }
+        }
+
+        return 'Member';
+    }
+
+    private function logActivity(Request $request, string $action, array $context = []): void
+    {
+        try {
+            $actor = (array) ($request->session()->get('authenticated_user', []) ?: []);
+            $rawLatitude = $request->input('activity_latitude', $request->input('latitude'));
+            $rawLongitude = $request->input('activity_longitude', $request->input('longitude'));
+            $latitude = is_numeric($rawLatitude) ? (float) $rawLatitude : null;
+            $longitude = is_numeric($rawLongitude) ? (float) $rawLongitude : null;
+            $entry = [
+                'timestamp' => now()->format('Y-m-d H:i:s'),
+                'action' => $action,
+                'actor' => [
+                    'userid' => isset($actor['userid']) ? (int) $actor['userid'] : null,
+                    'username' => isset($actor['username']) ? (string) $actor['username'] : 'guest',
+                    'roleid' => isset($actor['roleid']) ? (int) $actor['roleid'] : null,
+                    'levelid' => isset($actor['levelid']) ? (int) $actor['levelid'] : null,
+                ],
+                'ip' => (string) $request->ip(),
+                'longitude' => $longitude,
+                'latitude' => $latitude,
+                'user_agent' => (string) ($request->userAgent() ?? ''),
+                'context' => $context,
+            ];
+
+            $path = storage_path('app/activity_log.jsonl');
+            File::append($path, json_encode($entry, JSON_UNESCAPED_SLASHES) . PHP_EOL);
+        } catch (\Throwable $e) {
+            // Keep app flow safe even when logging fails.
+        }
+    }
+
+    private function readActivityLogs(?int $limit = 200): array
+    {
+        $path = storage_path('app/activity_log.jsonl');
+        if (!File::exists($path)) {
+            return [];
+        }
+
+        $raw = (string) File::get($path);
+        if ($raw === '') {
+            return [];
+        }
+
+        $lines = preg_split('/\r\n|\r|\n/', $raw) ?: [];
+        $logs = [];
+
+        foreach (array_reverse($lines) as $line) {
+            $line = trim((string) $line);
+            if ($line === '') {
+                continue;
+            }
+
+            $decoded = json_decode($line, true);
+            if (!is_array($decoded)) {
+                continue;
+            }
+
+            $logs[] = $decoded;
+            if (is_int($limit) && $limit > 0 && count($logs) >= $limit) {
+                break;
+            }
+        }
+
+        return $logs;
     }
 
     private function getSystemSettings(): array

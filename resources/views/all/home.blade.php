@@ -23,7 +23,15 @@
         $targetMember = $currentMember ?: $firstMember;
         $isFirstMemberMe = $firstMember && (int) ($firstMember->userid ?? 0) === $currentUserId;
         $relationMap = $relationLabels ?? [];
+        $canDeletePartnerMap = $canDeletePartnerMap ?? [];
+        $canDeleteChildMap = $canDeleteChildMap ?? [];
+        $canUpdateLifeStatusMap = $canUpdateLifeStatusMap ?? [];
         $firstMemberRelation = $firstMember ? ($relationMap[(int) $firstMember->memberid] ?? 'Family Member') : 'Family Member';
+        $firstMemberLifeStatusRaw = strtolower((string) ($firstMember->life_status ?? 'alive'));
+        $firstCanDeletePartner = $firstMember ? !empty($canDeletePartnerMap[(int) $firstMember->memberid]) : false;
+        $firstCanDeleteChild = $firstMember ? !empty($canDeleteChildMap[(int) $firstMember->memberid]) : false;
+        $firstCanUpdateLifeStatus = $firstMember ? !empty($canUpdateLifeStatusMap[(int) $firstMember->memberid]) : false;
+        $firstShowActionBlock = $firstCanDeletePartner || $firstCanDeleteChild || $firstCanUpdateLifeStatus;
         $totalMembers = $members->count();
         $aliveMembers = $members->filter(function ($member) {
             return strtolower((string) ($member->life_status ?? '')) === 'alive';
@@ -95,7 +103,7 @@
                     <p>Get to know your family members.</p>
                 </div>
                 <div class="tree-tools">
-                    <input id="searchMember" class="search" type="search" placeholder="Search family member">
+                    <button id="saveTreeImageBtn" class="btn btn-soft" type="button">Save Image</button>
                     <div class="tree-zoom-controls">
                         <button id="treeZoomOutBtn" class="btn btn-ghost tree-zoom-btn" type="button" aria-label="Zoom out">-</button>
                         <span id="treeZoomValue" class="tree-zoom-value">100%</span>
@@ -116,6 +124,9 @@
                                         'node' => $node,
                                         'initialMemberId' => $firstMember->memberid ?? 0,
                                         'relationMap' => $relationMap,
+                                        'canDeletePartnerMap' => $canDeletePartnerMap,
+                                        'canDeleteChildMap' => $canDeleteChildMap,
+                                        'canUpdateLifeStatusMap' => $canUpdateLifeStatusMap,
                                         'depth' => 0,
                                     ]); ?>
                                 <?php endforeach; ?>
@@ -135,7 +146,7 @@
                             type="button"
                             class="btn btn-ghost panel-switch-btn <?php echo e($activePanel !== 'add-member' ? 'is-active' : ''); ?>"
                         >
-                            Profile
+                            Details
                         </button>
                     <?php endif; ?>
                     <?php if ($canAddMemberFromHome): ?>
@@ -152,100 +163,65 @@
 
             <div id="memberDetailBlock" class="<?php echo e($activePanel === 'add-member' ? 'hidden' : ''); ?>">
                 <h4>Member Details</h4>
-                <div class="detail-card">
-                    <div id="detailPhotoWrap" class="detail-photo-wrap <?php echo e($isFirstMemberMe ? 'is-editable' : ''); ?>">
+                <div id="detailCard" class="detail-card <?php echo e($firstMemberLifeStatusRaw === 'deceased' ? 'is-deceased' : ''); ?>">
+                    <div id="detailPhotoWrap" class="detail-photo-wrap">
                         <img
                             id="detailPhoto"
-                            class="detail-photo <?php echo e($isFirstMemberMe ? 'is-editable' : ''); ?>"
+                            class="detail-photo"
                             src="<?php echo e($firstMember->picture ?? ''); ?>"
                             alt="<?php echo e($firstMember->name ?? 'Member'); ?>"
                             data-isme="<?php echo e($isFirstMemberMe ? '1' : '0'); ?>"
                         >
-                        <span class="detail-photo-overlay" aria-hidden="true">
-                            <span class="detail-photo-icon"></span>
-                        </span>
                     </div>
                     <h5 id="detailName" class="detail-name"><?php echo e($firstMember->name ?? '-'); ?></h5>
                     <p id="detailRole" class="detail-role"><?php echo e($firstMemberRelation); ?></p>
                     <ul class="detail-list">
                         <li><span>Age</span><strong id="detailAge"><?php echo e($firstMember->age ?? '-'); ?></strong></li>
+                        <li><span>Date of Birth</span><strong id="detailBirthdate"><?php echo e($firstMember->birthdate ?? '-'); ?></strong></li>
+                        <li><span>Birthplace</span><strong id="detailBirthplace"><?php echo e($firstMember->birthplace ?? '-'); ?></strong></li>
                         <li><span>Status</span><strong id="detailStatus"><?php echo e(isset($firstMember->life_status) ? ucfirst((string) $firstMember->life_status) : '-'); ?></strong></li>
+                        <li><span>Phone</span><strong id="detailPhone"><?php echo e($firstMember->phonenumber ?? '-'); ?></strong></li>
+                        <li><span>Email</span><strong id="detailEmail"><?php echo e($firstMember->email ?? '-'); ?></strong></li>
                         <li><span>Job</span><strong id="detailJob"><?php echo e($firstMember->job ?? '-'); ?></strong></li>
                         <li><span>Address</span><strong id="detailAddress"><?php echo e($firstMember->address ?? '-'); ?></strong></li>
                         <li><span>Education</span><strong id="detailEducation"><?php echo e($firstMember->education_status ?? '-'); ?></strong></li>
                     </ul>
                 </div>
+
+                <?php if ($currentLevelId === 2): ?>
+                    <div id="memberActionBlock" class="member-action-block <?php echo e($firstShowActionBlock ? '' : 'hidden'); ?>">
+                        <h5>Parent Actions</h5>
+
+                        <form id="deletePartnerForm" method="POST" action="/family/member/delete" class="<?php echo e($firstCanDeletePartner ? '' : 'hidden'); ?>" onsubmit="return confirm('Delete this partner account permanently?')">
+                            <?php echo csrf_field(); ?>
+                            <input id="deletePartnerMemberIdInput" type="hidden" name="memberid" value="<?php echo e((int) ($firstMember->memberid ?? 0)); ?>">
+                            <button type="submit" class="btn btn-danger-soft btn-block">Delete Partner</button>
+                        </form>
+
+                        <form id="deleteChildForm" method="POST" action="/family/member/delete" class="<?php echo e($firstCanDeleteChild ? '' : 'hidden'); ?>" onsubmit="return confirm('Delete this child account permanently?')">
+                            <?php echo csrf_field(); ?>
+                            <input id="deleteChildMemberIdInput" type="hidden" name="memberid" value="<?php echo e((int) ($firstMember->memberid ?? 0)); ?>">
+                            <button type="submit" class="btn btn-danger-soft btn-block">Delete Child</button>
+                        </form>
+
+                        <form id="lifeStatusForm" method="POST" action="/family/member/life-status" class="<?php echo e($firstCanUpdateLifeStatus ? '' : 'hidden'); ?>">
+                            <?php echo csrf_field(); ?>
+                            <input id="lifeStatusMemberIdInput" type="hidden" name="memberid" value="<?php echo e((int) ($firstMember->memberid ?? 0)); ?>">
+                            <label for="lifeStatusSelect">Life Status</label>
+                            <div class="life-status-row">
+                                <select id="lifeStatusSelect" name="life_status">
+                                    <option value="alive" <?php echo e($firstMemberLifeStatusRaw === 'alive' ? 'selected' : ''); ?>>Alive</option>
+                                    <option value="deceased" <?php echo e($firstMemberLifeStatusRaw === 'deceased' ? 'selected' : ''); ?>>Deceased</option>
+                                </select>
+                                <button id="saveLifeStatusBtn" type="submit" class="btn btn-soft">Save</button>
+                            </div>
+                        </form>
+                    </div>
+                <?php endif; ?>
             </div>
 
             <?php if ($canEditOwnProfile || $canAddMemberFromHome): ?>
                 <div class="detail-form-wrap">
-                    <?php if ($canEditOwnProfile): ?>
-                        <div id="profilePanel" class="detail-panel <?php echo e($activePanel === 'add-member' ? 'hidden' : ''); ?>">
-                            <h5>Complete Your Profile</h5>
-                            <p>Fill in job, address, and education if your data is empty.</p>
-                            <div id="profileAjaxAlert" class="hidden"></div>
-                            <form id="profileForm" method="POST" action="/family/profile" class="detail-form" enctype="multipart/form-data">
-                                <?php echo csrf_field(); ?>
-                                <input type="hidden" name="home_panel" value="profile">
-                                <input id="profilePictureInput" type="file" name="picture" accept="image/*" class="hidden">
-
-                                <div class="detail-form-field">
-                                    <label for="profileJob">Job</label>
-                                    <input
-                                        id="profileJob"
-                                        type="text"
-                                        name="job"
-                                        value="<?php echo e(old('job', $currentFamilyProfile->job ?? '')); ?>"
-                                        placeholder="Example: Engineer"
-                                    >
-                                </div>
-
-                                <div class="detail-form-field">
-                                    <label for="profileAddress">Address</label>
-                                    <input
-                                        id="profileAddress"
-                                        type="text"
-                                        name="address"
-                                        value="<?php echo e(old('address', $currentFamilyProfile->address ?? '')); ?>"
-                                        placeholder="Enter your address"
-                                    >
-                                </div>
-
-                                <div class="detail-form-field">
-                                    <label for="profileEducation">Education</label>
-                                    <input
-                                        id="profileEducation"
-                                        type="text"
-                                        name="education_status"
-                                        value="<?php echo e(old('education_status', $currentFamilyProfile->education_status ?? '')); ?>"
-                                        placeholder="Example: Bachelor Degree"
-                                    >
-                                </div>
-
-                                <button type="submit" class="btn btn-primary">Save Profile</button>
-                            </form>
-                        </div>
-
-                        <div id="photoCropModal" class="photo-crop-modal hidden" role="dialog" aria-modal="true" aria-labelledby="photoCropTitle">
-                            <div class="photo-crop-backdrop"></div>
-                            <div class="photo-crop-card">
-                                <h4 id="photoCropTitle">Crop Profile Photo</h4>
-                                <p>Move and zoom to adjust your photo.</p>
-                                <div class="photo-crop-stage-wrap">
-                                    <canvas id="photoCropCanvas" class="photo-crop-canvas" width="320" height="320"></canvas>
-                                </div>
-                                <div class="photo-crop-zoom">
-                                    <label for="photoCropZoom">Zoom</label>
-                                    <input id="photoCropZoom" type="range" min="1" max="3" step="0.01" value="1">
-                                </div>
-                                <div class="photo-crop-actions">
-                                    <button id="photoCropCancelBtn" type="button" class="btn btn-ghost">Cancel</button>
-                                    <button id="photoCropApplyBtn" type="button" class="btn btn-primary">Apply</button>
-                                </div>
-                            </div>
-                        </div>
-                    <?php endif; ?>
-
                     <?php if ($canAddMemberFromHome): ?>
                         <div id="addMemberPanel" class="detail-panel <?php echo e($activePanel === 'add-member' ? '' : 'hidden'); ?>">
                            <form method="POST" action="/family/member/store" class="detail-form">
@@ -349,3 +325,4 @@
         </aside>
     </section>
 </div>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>

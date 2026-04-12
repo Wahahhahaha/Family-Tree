@@ -14,7 +14,7 @@
 
     <section class="login-panel">
         <h2 class="panel-title">Forgot Password</h2>
-        <p class="panel-subtitle">Please provide your registered email address.</p>
+        <p class="panel-subtitle">Please provide your recovery method.</p>
 
         <?php if (session('status')): ?>
             <div class="alert-box alert-success-soft">
@@ -40,6 +40,10 @@
 
             <button class="btn-login" type="submit">Send Reset Link</button>
         </form>
+
+        <div class="row" style="margin-top: 14px;">
+            <a class="forgot" href="/forgot-password/phone">Forgot password by phone number</a>
+        </div>
 
         <p class="panel-note">Remember your password? <a class="forgot" href="/login">Back to Sign In</a></p>
     </section>
