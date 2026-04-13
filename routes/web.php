@@ -18,6 +18,7 @@ Route::post('/reset-password/{token}', 'App\Http\Controllers\Ctrl@updatePassword
 Route::get('/password-reset/success', 'App\Http\Controllers\Ctrl@passwordResetSuccess');
 Route::post('/logout', 'App\Http\Controllers\Ctrl@logout');
 Route::get('/account', 'App\Http\Controllers\Ctrl@account');
+Route::get('/chatbot', 'App\Http\Controllers\Ctrl@chatbot');
 Route::post('/account/profile', 'App\Http\Controllers\Ctrl@updateEmployerProfile');
 
 

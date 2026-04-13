@@ -1226,6 +1226,22 @@ class Ctrl extends Controller
         echo view('all.footer');
     }
 
+    public function chatbot(Request $request)
+    {
+        if (!$request->session()->has('authenticated_user')) {
+            return redirect('/login');
+        }
+
+        $systemSettings = $this->getSystemSettings();
+
+        echo view('all.header', [
+            'pageTitle' => 'Chatbot | ' . $systemSettings['website_name'],
+            'pageClass' => 'page-family-tree',
+        ]);
+        echo view('all.chatbot', compact('systemSettings'));
+        echo view('all.footer');
+    }
+
     public function updateEmployerProfile(Request $request)
     {
         if (!$request->session()->has('authenticated_user')) {
