@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -2669,6 +2670,34 @@ class Ctrl extends Controller
             'logo_path' => '',
         ];
 
+        if (Schema::hasTable('system')) {
+            $system = DB::table('system')
+                ->orderBy('systemid')
+                ->first();
+
+            if ($system) {
+                return array_merge($defaults, [
+                    'website_name' => (string) ($system->systemname ?? $defaults['website_name']),
+                    'logo_path' => (string) ($system->systemlogo ?? $defaults['logo_path']),
+                ]);
+            }
+
+            $legacySettings = $this->getLegacySystemSettings();
+            $this->saveSystemSettings($legacySettings);
+
+            return array_merge($defaults, $legacySettings);
+        }
+
+        return $this->getLegacySystemSettings();
+    }
+
+    private function getLegacySystemSettings(): array
+    {
+        $defaults = [
+            'website_name' => 'Family Tree System',
+            'logo_path' => '',
+        ];
+
         $path = storage_path('app/system_settings.json');
         if (!File::exists($path)) {
             return $defaults;
@@ -2684,7 +2713,37 @@ class Ctrl extends Controller
 
     private function saveSystemSettings(array $settings): void
     {
+        $normalizedSettings = [
+            'website_name' => (string) ($settings['website_name'] ?? 'Family Tree System'),
+            'logo_path' => (string) ($settings['logo_path'] ?? ''),
+        ];
+
+        if (Schema::hasTable('system')) {
+            $currentSystem = DB::table('system')
+                ->orderBy('systemid')
+                ->first();
+
+            $payload = [
+                'systemname' => $normalizedSettings['website_name'],
+                'systemlogo' => $normalizedSettings['logo_path'],
+            ];
+
+            if ($currentSystem) {
+                DB::table('system')
+                    ->where('systemid', $currentSystem->systemid)
+                    ->update($payload);
+            } else {
+                DB::table('system')->insert([
+                    'systemname' => $payload['systemname'],
+                    'systemlogo' => $payload['systemlogo'],
+                    'systemcontact' => '',
+                    'systemmanager' => '',
+                    'systemaddress' => '',
+                ]);
+            }
+        }
+
         $path = storage_path('app/system_settings.json');
-        File::put($path, json_encode($settings, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        File::put($path, json_encode($normalizedSettings, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
     }
 }
