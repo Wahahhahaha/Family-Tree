@@ -35,9 +35,7 @@
 
 .page-login .login-shell {
     width: 100%;
-    max-width: 980px;
-    display: grid;
-    grid-template-columns: 1.1fr 1fr;
+    max-width: 520px;
     border-radius: 26px;
     overflow: hidden;
     box-shadow: var(--shadow);
@@ -46,76 +44,8 @@
     animation: fade-up 0.55s ease;
 }
 
-.page-login .login-brand {
-    background:
-        linear-gradient(175deg, rgba(33, 154, 214, 0.1), rgba(24, 179, 130, 0.1)),
-        var(--surface-soft);
-    color: var(--text);
-    padding: 44px;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    gap: 14px;
-}
-
-.page-login .brand-badge {
-    width: fit-content;
-    padding: 7px 13px;
-    border: 1px solid #cbe0ed;
-    border-radius: 999px;
-    font-size: 12px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--primary-deep);
-    font-weight: 800;
-}
-
-.page-login .brand-title {
-    margin: 0;
-    font-size: 36px;
-    line-height: 1.15;
-    max-width: 400px;
-}
-
-.page-login .brand-subtitle {
-    margin: 0;
-    color: var(--muted);
-    font-size: 15px;
-    line-height: 1.6;
-    max-width: 430px;
-}
-
-.page-login .brand-points {
-    margin: 6px 0 0;
-    padding: 0;
-    list-style: none;
-    display: grid;
-    gap: 10px;
-}
-
-.page-login .brand-points li {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 14px;
-    font-weight: 600;
-    color: #1f3d53;
-}
-
-.page-login .brand-points li span {
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
-    display: grid;
-    place-items: center;
-    background: #e4f2fa;
-    color: var(--primary-deep);
-    font-size: 12px;
-    font-weight: 800;
-}
-
 .page-login .login-panel {
-    padding: 44px 40px;
+    padding: 44px 36px;
 }
 
 .page-login .panel-title {
@@ -275,6 +205,139 @@
     align-items: center;
     justify-content: center;
     text-decoration: none;
+}
+
+.page-login .auth-shell {
+    max-width: 560px;
+}
+
+.page-login .method-switch {
+    margin-bottom: 16px;
+    padding: 4px;
+    background: #eef4f8;
+    border: 1px solid #d5e3ee;
+    border-radius: 12px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+}
+
+.page-login .method-btn {
+    height: 38px;
+    border: 0;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #4d6579;
+    background: transparent;
+    cursor: pointer;
+    transition: 0.2s ease;
+}
+
+.page-login .method-btn.is-active {
+    color: #ffffff;
+    background: linear-gradient(110deg, var(--primary), var(--accent));
+}
+
+.page-login .auth-panel {
+    display: none;
+}
+
+.page-login .auth-panel.is-active {
+    display: block;
+}
+
+.page-login .phone-send-form {
+    margin-bottom: 12px;
+}
+
+.page-login .phone-otp-form {
+    border-top: 1px dashed rgba(107, 114, 128, 0.35);
+    padding-top: 12px;
+}
+
+.page-login .otp-note {
+    margin: 0 0 10px;
+    font-size: 12px;
+    color: #4b5563;
+}
+
+.page-login .auth-row-spaced {
+    margin-top: 10px;
+}
+
+.page-login .otp-modal {
+    position: fixed;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 999;
+}
+
+.page-login .otp-modal.is-visible {
+    display: flex;
+}
+
+.page-login .otp-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(17, 24, 39, 0.55);
+    opacity: 0;
+    animation: otpFadeIn 0.26s ease forwards;
+}
+
+.page-login .otp-modal-dialog {
+    position: relative;
+    width: min(92%, 420px);
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 22px 20px;
+    box-shadow: 0 20px 45px rgba(17, 24, 39, 0.24);
+    opacity: 0;
+    transform: translateY(10px);
+    animation: otpFadeInUp 0.28s ease forwards;
+}
+
+.page-login .otp-modal.fade-out .otp-modal-backdrop {
+    animation: otpFadeOut 0.22s ease forwards;
+}
+
+.page-login .otp-modal.fade-out .otp-modal-dialog {
+    animation: otpFadeOutDown 0.24s ease forwards;
+}
+
+.page-login .otp-modal-dialog h3 {
+    margin: 0 0 8px;
+    font-size: 20px;
+    color: #111827;
+}
+
+.page-login .otp-modal-dialog p {
+    margin: 0 0 16px;
+    color: #374151;
+    font-size: 14px;
+    line-height: 1.45;
+}
+
+@keyframes otpFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes otpFadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+@keyframes otpFadeInUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes otpFadeOutDown {
+    from { opacity: 1; transform: translateY(0); }
+    to { opacity: 0; transform: translateY(8px); }
 }
 
 /* Family Tree Page */
@@ -2005,20 +2068,11 @@
 
 @media (max-width: 850px) {
     .page-login .login-shell {
-        grid-template-columns: 1fr;
-        max-width: 560px;
-    }
-
-    .page-login .login-brand {
-        padding: 30px 26px;
+        max-width: 520px;
     }
 
     .page-login .login-panel {
         padding: 32px 26px;
-    }
-
-    .page-login .brand-title {
-        font-size: 30px;
     }
 }
 

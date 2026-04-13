@@ -1,27 +1,15 @@
 <main class="login-shell auth-shell">
-    <section class="login-brand">
-        <span class="brand-badge"><?php echo e($systemSettings['website_name'] ?? 'Family Tree System'); ?></span>
-        <h1 class="brand-title">Password Reset Successful</h1>
-        <p class="brand-subtitle">
-            Your password has been updated successfully. You can now sign in using your new password.
-        </p>
-        <ul class="brand-points">
-            <li><span>01</span> Your account credentials are now updated</li>
-            <li><span>02</span> Keep your new password secure</li>
-            <li><span>03</span> Redirecting to sign-in page shortly</li>
-        </ul>
-    </section>
-
     <section class="login-panel">
-        <h2 class="panel-title">Success</h2>
-        <p class="panel-subtitle">Password reset completed.</p>
+        <h2 class="panel-title">Reset Password Berhasil</h2>
+        <p class="panel-subtitle">Password akun Anda sudah diperbarui dan siap digunakan.</p>
 
         <div class="alert-box alert-success-soft">
-            <p>Your password has been reset successfully.</p>
-            <p>You will be redirected to the login page in <span id="redirectSeconds">3</span> seconds.</p>
+            <p>Password baru berhasil disimpan.</p>
+            <p>Anda akan diarahkan ke halaman login dalam <span id="redirectSeconds">3</span> detik.</p>
         </div>
 
-        <a class="btn-login inline-btn" href="/login">Go to Login Now</a>
+        <a class="btn-login inline-btn" href="/login">Masuk Sekarang</a>
+        <p class="panel-note">Jika tidak teralihkan otomatis, klik tombol di atas.</p>
     </section>
 </main>
 
