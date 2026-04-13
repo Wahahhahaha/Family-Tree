@@ -689,6 +689,12 @@
     gap: 10px;
 }
 
+.page-family-tree .tree-tools-secondary {
+    display: flex;
+    justify-content: center;
+    margin-top: 14px;
+}
+
 .page-family-tree .tree-zoom-controls {
     display: inline-flex;
     align-items: center;

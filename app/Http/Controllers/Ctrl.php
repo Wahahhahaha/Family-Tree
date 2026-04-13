@@ -583,76 +583,195 @@ class Ctrl extends Controller
             $relationLabels[$targetId] = 'Relative';
         }
 
-        $candidateRoots = $familyMembers
-            ->pluck('memberid')
-            ->filter(function ($memberId) use ($parentCount) {
-                return !isset($parentCount[(int) $memberId]);
-            })
-            ->values()
-            ->all();
+        $generationMap = [];
+        if ($currentMemberId !== 0 && isset($membersById[$currentMemberId])) {
+            $queue = [[$currentMemberId, 0]];
+            $generationMap[$currentMemberId] = 0;
 
-        if (empty($candidateRoots)) {
-            $candidateRoots = $familyMembers->pluck('memberid')->values()->all();
+            while (!empty($queue)) {
+                [$memberId, $generation] = array_shift($queue);
+
+                foreach ($partnerMap[$memberId] ?? [] as $partnerId) {
+                    $partnerId = (int) $partnerId;
+                    if (!isset($membersById[$partnerId]) || array_key_exists($partnerId, $generationMap)) {
+                        continue;
+                    }
+
+                    $generationMap[$partnerId] = $generation;
+                    $queue[] = [$partnerId, $generation];
+                }
+
+                foreach ($childrenMap[$memberId] ?? [] as $childId) {
+                    $childId = (int) $childId;
+                    if (!isset($membersById[$childId]) || array_key_exists($childId, $generationMap)) {
+                        continue;
+                    }
+
+                    $generationMap[$childId] = $generation + 1;
+                    $queue[] = [$childId, $generation + 1];
+                }
+
+                foreach ($parentMap[$memberId] ?? [] as $parentId) {
+                    $parentId = (int) $parentId;
+                    if (!isset($membersById[$parentId]) || array_key_exists($parentId, $generationMap)) {
+                        continue;
+                    }
+
+                    $generationMap[$parentId] = $generation - 1;
+                    $queue[] = [$parentId, $generation - 1];
+                }
+            }
         }
 
-        $usedMemberIds = [];
-        $buildNode = function (int $memberId, array $ancestorIds = []) use (&$buildNode, &$usedMemberIds, $membersById, $childrenMap, $partnerMap) {
-            if (isset($ancestorIds[$memberId]) || !isset($membersById[$memberId])) {
-                return null;
+        $buildTreeRoots = function (?array $allowedMemberIds = null) use ($familyMembers, $parentCount, $membersById, $childrenMap, $partnerMap) {
+            $allowedSet = null;
+            if (is_array($allowedMemberIds)) {
+                $allowedSet = [];
+                foreach ($allowedMemberIds as $allowedMemberId) {
+                    $allowedSet[(int) $allowedMemberId] = true;
+                }
             }
 
-            if (isset($usedMemberIds[$memberId])) {
-                return null;
+            $candidateRoots = $familyMembers
+                ->pluck('memberid')
+                ->filter(function ($memberId) use ($parentCount, $allowedSet) {
+                    $memberId = (int) $memberId;
+                    if ($allowedSet !== null && !isset($allowedSet[$memberId])) {
+                        return false;
+                    }
+
+                    return !isset($parentCount[$memberId]);
+                })
+                ->values()
+                ->all();
+
+            if (empty($candidateRoots)) {
+                $candidateRoots = $familyMembers
+                    ->pluck('memberid')
+                    ->filter(function ($memberId) use ($allowedSet) {
+                        return $allowedSet === null || isset($allowedSet[(int) $memberId]);
+                    })
+                    ->values()
+                    ->all();
             }
 
-            $usedMemberIds[$memberId] = true;
-            $ancestorIds[$memberId] = true;
+            $usedMemberIds = [];
+            $buildNode = function (int $memberId, array $ancestorIds = []) use (&$buildNode, &$usedMemberIds, $membersById, $childrenMap, $partnerMap, $allowedSet) {
+                if (isset($ancestorIds[$memberId]) || !isset($membersById[$memberId])) {
+                    return null;
+                }
 
-            $partnerMembers = collect();
-            foreach ($partnerMap[$memberId] ?? [] as $partnerId) {
-                if (!isset($membersById[$partnerId])) {
+                if ($allowedSet !== null && !isset($allowedSet[$memberId])) {
+                    return null;
+                }
+
+                if (isset($usedMemberIds[$memberId])) {
+                    return null;
+                }
+
+                $usedMemberIds[$memberId] = true;
+                $ancestorIds[$memberId] = true;
+
+                $partnerMembers = collect();
+                foreach ($partnerMap[$memberId] ?? [] as $partnerId) {
+                    $partnerId = (int) $partnerId;
+                    if (!isset($membersById[$partnerId])) {
+                        continue;
+                    }
+
+                    if ($allowedSet !== null && !isset($allowedSet[$partnerId])) {
+                        continue;
+                    }
+
+                    if (!isset($usedMemberIds[$partnerId])) {
+                        $usedMemberIds[$partnerId] = true;
+                        $partnerMembers->push($membersById[$partnerId]);
+                    }
+                }
+
+                $children = [];
+                foreach ($childrenMap[$memberId] ?? [] as $childId) {
+                    $childNode = $buildNode((int) $childId, $ancestorIds);
+                    if ($childNode !== null) {
+                        $children[] = $childNode;
+                    }
+                }
+
+                return [
+                    'member' => $membersById[$memberId],
+                    'partners' => $partnerMembers->values()->all(),
+                    'children' => $children,
+                ];
+            };
+
+            $treeRoots = [];
+            foreach ($candidateRoots as $rootId) {
+                $rootNode = $buildNode((int) $rootId);
+                if ($rootNode !== null) {
+                    $treeRoots[] = $rootNode;
+                }
+            }
+
+            foreach ($familyMembers as $member) {
+                $memberId = (int) $member->memberid;
+                if ($allowedSet !== null && !isset($allowedSet[$memberId])) {
                     continue;
                 }
 
-                if (!isset($usedMemberIds[$partnerId])) {
-                    $usedMemberIds[$partnerId] = true;
-                    $partnerMembers->push($membersById[$partnerId]);
+                if (isset($usedMemberIds[$memberId])) {
+                    continue;
+                }
+
+                $node = $buildNode($memberId);
+                if ($node !== null) {
+                    $treeRoots[] = $node;
                 }
             }
 
-            $children = [];
-            foreach ($childrenMap[$memberId] ?? [] as $childId) {
-                $childNode = $buildNode((int) $childId, $ancestorIds);
-                if ($childNode !== null) {
-                    $children[] = $childNode;
-                }
-            }
-
-            return [
-                'member' => $membersById[$memberId],
-                'partners' => $partnerMembers->values()->all(),
-                'children' => $children,
-            ];
+            return $treeRoots;
         };
 
-        $treeRoots = [];
-        foreach ($candidateRoots as $rootId) {
-            $rootNode = $buildNode((int) $rootId);
-            if ($rootNode !== null) {
-                $treeRoots[] = $rootNode;
-            }
-        }
+        $fullTreeRoots = $buildTreeRoots();
+        $limitedMemberIds = $familyMembers
+            ->pluck('memberid')
+            ->filter(function ($memberId) use ($generationMap, $currentMemberId) {
+                $memberId = (int) $memberId;
+                if ($currentMemberId === 0 || !array_key_exists($memberId, $generationMap)) {
+                    return true;
+                }
 
-        foreach ($familyMembers as $member) {
-            $memberId = (int) $member->memberid;
-            if (isset($usedMemberIds[$memberId])) {
-                continue;
-            }
+                $generation = (int) $generationMap[$memberId];
+                return $generation >= -2 && $generation <= 2;
+            })
+            ->values()
+            ->all();
+        $limitedTreeRoots = $buildTreeRoots($limitedMemberIds);
+        $showFullTree = $request->boolean('show_full_tree');
+        $treeRoots = $showFullTree ? $fullTreeRoots : $limitedTreeRoots;
+        $hasHiddenTreeLevels = count($limitedMemberIds) < $familyMembers->count();
 
-            $node = $buildNode($memberId);
-            if ($node !== null) {
-                $treeRoots[] = $node;
-            }
+        $treeSummaryText = $showFullTree
+            ? 'Showing full family tree.'
+            : 'Showing members from your grandparents to your grandchildren.';
+
+        if (($request->ajax() || $request->expectsJson()) && $request->boolean('tree_section')) {
+            return response()->json([
+                'tree_html' => view('all.partials.family-tree-content', [
+                    'members' => $familyMembers,
+                    'renderTreeRoots' => $treeRoots,
+                    'firstMember' => $currentMember ?: $familyMembers->first(),
+                    'relationMap' => $relationLabels,
+                    'canDeletePartnerMap' => $canDeletePartnerMap,
+                    'canDeleteChildMap' => $canDeleteChildMap,
+                    'canUpdateLifeStatusMap' => $canUpdateLifeStatusMap,
+                ])->render(),
+                'show_full_tree' => $showFullTree,
+                'has_hidden_tree_levels' => $hasHiddenTreeLevels,
+                'toggle_tree_url' => $showFullTree
+                    ? $request->url()
+                    : $request->fullUrlWithQuery(['show_full_tree' => 1]),
+                'summary_text' => $treeSummaryText,
+            ]);
         }
 
         echo view('all.header', [
@@ -670,6 +789,9 @@ class Ctrl extends Controller
             'familyMembers',
             'currentFamilyProfile',
             'treeRoots',
+            'showFullTree',
+            'hasHiddenTreeLevels',
+            'treeSummaryText',
             'relationLabels',
             'currentMemberHasPartner',
             'canDeletePartnerMap',
@@ -1980,14 +2102,13 @@ class Ctrl extends Controller
             ]);
             $createdMemberId = (int) $newMemberId;
 
-            $expectedRelationCount = 0;
+            $relationsPersisted = true;
             if ($relationType === 'child') {
                 DB::table('relationship')->insert([
                     'memberid' => $targetMemberId,
                     'relatedmemberid' => $newMemberId,
                     'relationtype' => 'child',
                 ]);
-                $expectedRelationCount++;
 
                 if ($childParentingMode === 'with_current_partner' && $partnerMemberId) {
                     DB::table('relationship')->insert([
@@ -1995,7 +2116,6 @@ class Ctrl extends Controller
                         'relatedmemberid' => $newMemberId,
                         'relationtype' => 'child',
                     ]);
-                    $expectedRelationCount++;
                 }
             }
 
@@ -2011,7 +2131,6 @@ class Ctrl extends Controller
                     'relatedmemberid' => $targetMemberId,
                     'relationtype' => 'partner',
                 ]);
-                $expectedRelationCount += 2;
 
                 DB::table('family_member')
                     ->whereIn('memberid', [$targetMemberId, $newMemberId])
@@ -2027,12 +2146,44 @@ class Ctrl extends Controller
                 ->where('userid', $userId)
                 ->exists();
 
-            $relationshipCount = DB::table('relationship')
-                ->where('relatedmemberid', $newMemberId)
-                ->whereIn('relationtype', ['child', 'partner'])
-                ->count();
+            if ($relationType === 'child') {
+                $parentIds = [$targetMemberId];
+                if ($childParentingMode === 'with_current_partner' && $partnerMemberId) {
+                    $parentIds[] = (int) $partnerMemberId;
+                }
 
-            if (!$userExists || !$familyMemberExists || $relationshipCount < $expectedRelationCount) {
+                $persistedParentIds = DB::table('relationship')
+                    ->where('relationtype', 'child')
+                    ->where('relatedmemberid', $newMemberId)
+                    ->whereIn('memberid', $parentIds)
+                    ->pluck('memberid')
+                    ->map(function ($id) {
+                        return (int) $id;
+                    })
+                    ->unique()
+                    ->values()
+                    ->all();
+
+                $relationsPersisted = count($persistedParentIds) === count(array_unique($parentIds));
+            }
+
+            if ($relationType === 'partner') {
+                $hasForwardPartnerRelation = DB::table('relationship')
+                    ->where('memberid', $targetMemberId)
+                    ->where('relatedmemberid', $newMemberId)
+                    ->where('relationtype', 'partner')
+                    ->exists();
+
+                $hasBackwardPartnerRelation = DB::table('relationship')
+                    ->where('memberid', $newMemberId)
+                    ->where('relatedmemberid', $targetMemberId)
+                    ->where('relationtype', 'partner')
+                    ->exists();
+
+                $relationsPersisted = $hasForwardPartnerRelation && $hasBackwardPartnerRelation;
+            }
+
+            if (!$userExists || !$familyMemberExists || !$relationsPersisted) {
                 throw new \RuntimeException('Failed to persist new member data consistently.');
             }
         });

@@ -88,6 +88,8 @@
     var childParentingModeField = document.getElementById("childParentingModeField");
     var relationButtons = Array.prototype.slice.call(document.querySelectorAll(".relation-btn"));
     var treeSeeMoreButtons = Array.prototype.slice.call(document.querySelectorAll(".tree-see-more-btn"));
+    var treeExpandButtons = Array.prototype.slice.call(document.querySelectorAll(".tree-expand-toggle"));
+    var treeSummaryText = document.getElementById("treeSummaryText");
     var flashMessageModal = document.getElementById("flashMessageModal");
     var flashMessageOkBtn = document.getElementById("flashMessageOkBtn");
     var photoCropModal = document.getElementById("photoCropModal");
@@ -108,6 +110,21 @@
     var cropStartOffsetX = 0;
     var cropStartOffsetY = 0;
     var pendingCroppedPreviewUrl = "";
+    var treeToggleRequestInFlight = false;
+    var hasTreeMemberContext = false;
+
+    function refreshTreeDomState() {
+        cards = Array.prototype.slice.call(document.querySelectorAll(".member-card"));
+        treeContainer = document.getElementById("treeScrollArea");
+        treeZoomStage = document.getElementById("treeZoomStage");
+        treeCanvas = document.getElementById("treeCanvas");
+        treeSeeMoreButtons = Array.prototype.slice.call(document.querySelectorAll(".tree-see-more-btn"));
+        treeExpandButtons = Array.prototype.slice.call(document.querySelectorAll(".tree-expand-toggle"));
+        treeSummaryText = document.getElementById("treeSummaryText");
+        hasTreeMemberContext = Boolean(
+            cards.length && detailName && detailRole && detailAge && detailStatus && detailPhoto
+        );
+    }
 
     function closeFlashMessageModal() {
         if (!flashMessageModal || flashMessageModal.classList.contains("is-closing")) {
@@ -329,8 +346,17 @@
         syncChildParentingModeVisibility();
     }
 
-    if (treeSeeMoreButtons.length) {
+    function bindTreeSeeMoreButtons() {
+        if (!treeSeeMoreButtons.length) {
+            return;
+        }
+
         treeSeeMoreButtons.forEach(function (button) {
+            if (button.dataset.treeBound === "1") {
+                return;
+            }
+
+            button.dataset.treeBound = "1";
             button.addEventListener("click", function () {
                 var branch = button.nextElementSibling;
                 if (!branch || !branch.classList.contains("tree-extra-children")) {
@@ -347,6 +373,108 @@
                     button.setAttribute("data-open", "1");
                     button.textContent = "See less";
                 }
+            });
+        });
+    }
+
+    function syncTreeExpandButtons(showButtons, showFullTree, toggleUrl) {
+        refreshTreeDomState();
+
+        treeExpandButtons.forEach(function (button) {
+            button.classList.toggle("hidden", !showButtons);
+            button.textContent = showFullTree ? "Show less" : "View more";
+
+            if (showButtons && toggleUrl) {
+                button.setAttribute("data-tree-toggle-url", toggleUrl);
+                button.setAttribute("data-show-full", showFullTree ? "1" : "0");
+            } else {
+                button.removeAttribute("data-tree-toggle-url");
+                button.removeAttribute("data-show-full");
+            }
+        });
+    }
+
+    function getTreeSectionAjaxUrl(url) {
+        var target = new URL(getAjaxUrl(url), window.location.origin);
+        target.searchParams.set("tree_section", "1");
+        return target.toString();
+    }
+
+    function bindTreeExpandButtons() {
+        if (!treeExpandButtons.length) {
+            return;
+        }
+
+        treeExpandButtons.forEach(function (button) {
+            if (button.dataset.treeAjaxBound === "1") {
+                return;
+            }
+
+            button.dataset.treeAjaxBound = "1";
+            button.addEventListener("click", function () {
+                var url = button.getAttribute("data-tree-toggle-url");
+                if (!url || treeToggleRequestInFlight) {
+                    return;
+                }
+
+                var selectedCard = document.querySelector(".member-card.active");
+                var selectedMemberId = selectedCard ? selectedCard.getAttribute("data-memberid") : "";
+
+                treeToggleRequestInFlight = true;
+                treeExpandButtons.forEach(function (item) {
+                    item.disabled = true;
+                });
+
+                fetch(getTreeSectionAjaxUrl(url), {
+                    headers: {
+                        "X-Requested-With": "XMLHttpRequest",
+                        "Accept": "application/json"
+                    }
+                })
+                    .then(function (response) {
+                        if (!response.ok) {
+                            throw new Error("Failed to load family tree.");
+                        }
+                        return response.json();
+                    })
+                    .then(function (data) {
+                        if (treeContainer) {
+                            treeContainer.innerHTML = data.tree_html || "";
+                        }
+
+                        if (treeSummaryText) {
+                            treeSummaryText.textContent = data.summary_text || "";
+                        }
+
+                        syncTreeExpandButtons(Boolean(data.has_hidden_tree_levels), Boolean(data.show_full_tree), data.toggle_tree_url || "");
+                        bindTreeSeeMoreButtons();
+                        bindTreeCardClicks();
+
+                        window.dispatchEvent(new Event("resize"));
+
+                        var nextActiveCard = selectedMemberId
+                            ? document.querySelector('.member-card[data-memberid="' + selectedMemberId + '"]')
+                            : null;
+                        if (!nextActiveCard) {
+                            nextActiveCard = document.querySelector(".member-card.active") || document.querySelector(".member-card");
+                        }
+
+                        if (nextActiveCard) {
+                            setActive(nextActiveCard);
+                        }
+
+                        var browserUrl = new URL(url, window.location.origin);
+                        browserUrl.searchParams.delete("ajax");
+                        browserUrl.searchParams.delete("tree_section");
+                        window.history.pushState({}, "", browserUrl.toString());
+                    })
+                    .catch(function () {})
+                    .finally(function () {
+                        treeToggleRequestInFlight = false;
+                        treeExpandButtons.forEach(function (item) {
+                            item.disabled = false;
+                        });
+                    });
             });
         });
     }
@@ -1237,9 +1365,7 @@
         });
     }
 
-    var hasTreeMemberContext = Boolean(
-        cards.length && detailName && detailRole && detailAge && detailStatus && detailPhoto
-    );
+    refreshTreeDomState();
 
     function syncDetailPhotoEditable() {
         if (!detailPhoto) {
@@ -1385,6 +1511,24 @@
         syncMemberActionAccessBySelectedCard(card);
     }
 
+    function bindTreeCardClicks() {
+        if (!hasTreeMemberContext) {
+            return;
+        }
+
+        cards.forEach(function (card) {
+            if (card.dataset.treeCardBound === "1") {
+                return;
+            }
+
+            card.dataset.treeCardBound = "1";
+            card.addEventListener("click", function () {
+                setSidePanel("profile");
+                setActive(card);
+            });
+        });
+    }
+
     if (profilePictureInput && detailPhoto) {
         detailPhoto.addEventListener("click", function () {
             if (detailPhoto.dataset.isme !== "1") {
@@ -1507,12 +1651,9 @@
     }
 
     if (hasTreeMemberContext) {
-        cards.forEach(function (card) {
-            card.addEventListener("click", function () {
-                setSidePanel("profile");
-                setActive(card);
-            });
-        });
+        bindTreeSeeMoreButtons();
+        bindTreeExpandButtons();
+        bindTreeCardClicks();
 
         var initialActiveCard = document.querySelector(".member-card.active");
         if (initialActiveCard) {

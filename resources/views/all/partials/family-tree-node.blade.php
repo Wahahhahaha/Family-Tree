@@ -7,7 +7,7 @@
     $canDeleteChildMap = $canDeleteChildMap ?? [];
     $canUpdateLifeStatusMap = $canUpdateLifeStatusMap ?? [];
     $depth = (int) ($depth ?? 0);
-    $maxVisibleDepth = 4;
+    $maxVisibleDepth = isset($maxVisibleDepth) ? (int) $maxVisibleDepth : 99;
     $isActive = (int) ($nodeMember->memberid ?? 0) === (int) ($initialMemberId ?? 0);
     $currentUserId = (int) (session('authenticated_user.userid') ?? 0);
     $isMe = (int) ($nodeMember->userid ?? 0) === $currentUserId;
@@ -99,6 +99,7 @@
                     'canDeletePartnerMap' => $canDeletePartnerMap,
                     'canDeleteChildMap' => $canDeleteChildMap,
                     'canUpdateLifeStatusMap' => $canUpdateLifeStatusMap,
+                    'maxVisibleDepth' => $maxVisibleDepth,
                     'depth' => $depth + 1,
                 ]); ?>
             <?php endforeach; ?>
@@ -114,6 +115,7 @@
                     'canDeletePartnerMap' => $canDeletePartnerMap,
                     'canDeleteChildMap' => $canDeleteChildMap,
                     'canUpdateLifeStatusMap' => $canUpdateLifeStatusMap,
+                    'maxVisibleDepth' => $maxVisibleDepth,
                     'depth' => $depth + 1,
                 ]); ?>
             <?php endforeach; ?>
