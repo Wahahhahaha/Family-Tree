@@ -39,6 +39,7 @@
     var systemLogoPlaceholder = document.getElementById("systemLogoPlaceholder");
     var systemSettingsForm = document.getElementById("systemSettingsForm");
     var settingsAjaxAlert = document.getElementById("settingsAjaxAlert");
+    var navbarWelcomeName = document.getElementById("navbarWelcomeName");
     var csrfMeta = document.querySelector('meta[name="csrf-token"]');
     var csrfToken = csrfMeta ? csrfMeta.getAttribute("content") : "";
     var cards = Array.prototype.slice.call(document.querySelectorAll(".member-card"));
@@ -112,6 +113,19 @@
     var pendingCroppedPreviewUrl = "";
     var treeToggleRequestInFlight = false;
     var hasTreeMemberContext = false;
+
+    function updateNavbarWelcomeName(nextName) {
+        if (!navbarWelcomeName) {
+            return;
+        }
+
+        var safeName = String(nextName || "").trim();
+        if (safeName === "") {
+            return;
+        }
+
+        navbarWelcomeName.textContent = safeName;
+    }
 
     function refreshTreeDomState() {
         cards = Array.prototype.slice.call(document.querySelectorAll(".member-card"));
@@ -377,19 +391,34 @@
         });
     }
 
-    function syncTreeExpandButtons(showButtons, showFullTree, toggleUrl) {
+    function syncTreeExpandButtons(treeState) {
         refreshTreeDomState();
 
         treeExpandButtons.forEach(function (button) {
-            button.classList.toggle("hidden", !showButtons);
-            button.textContent = showFullTree ? "Show less" : "View more";
+            var direction = button.getAttribute("data-tree-direction") || "";
+            var isUpper = direction === "upper";
+            var hasHiddenLevels = isUpper
+                ? Boolean(treeState.hasHiddenUpperTreeLevels)
+                : Boolean(treeState.hasHiddenLowerTreeLevels);
+            var isExpanded = isUpper
+                ? Boolean(treeState.showUpperTree)
+                : Boolean(treeState.showLowerTree);
+            var toggleUrl = isUpper ? (treeState.toggleUpperTreeUrl || "") : (treeState.toggleLowerTreeUrl || "");
+            var shouldShowButton = hasHiddenLevels || isExpanded;
+            var secondaryWrap = button.closest(".tree-tools-secondary");
 
-            if (showButtons && toggleUrl) {
+            button.classList.toggle("hidden", !shouldShowButton);
+            button.textContent = isExpanded ? "Show less" : "View more";
+            if (secondaryWrap) {
+                secondaryWrap.classList.toggle("hidden", !shouldShowButton);
+            }
+
+            if (shouldShowButton && toggleUrl) {
                 button.setAttribute("data-tree-toggle-url", toggleUrl);
-                button.setAttribute("data-show-full", showFullTree ? "1" : "0");
+                button.setAttribute("data-tree-expanded", isExpanded ? "1" : "0");
             } else {
                 button.removeAttribute("data-tree-toggle-url");
-                button.removeAttribute("data-show-full");
+                button.removeAttribute("data-tree-expanded");
             }
         });
     }
@@ -446,7 +475,14 @@
                             treeSummaryText.textContent = data.summary_text || "";
                         }
 
-                        syncTreeExpandButtons(Boolean(data.has_hidden_tree_levels), Boolean(data.show_full_tree), data.toggle_tree_url || "");
+                        syncTreeExpandButtons({
+                            hasHiddenUpperTreeLevels: Boolean(data.has_hidden_upper_tree_levels),
+                            hasHiddenLowerTreeLevels: Boolean(data.has_hidden_lower_tree_levels),
+                            showUpperTree: Boolean(data.show_upper_tree),
+                            showLowerTree: Boolean(data.show_lower_tree),
+                            toggleUpperTreeUrl: data.toggle_upper_tree_url || "",
+                            toggleLowerTreeUrl: data.toggle_lower_tree_url || ""
+                        });
                         bindTreeSeeMoreButtons();
                         bindTreeCardClicks();
 
@@ -769,6 +805,8 @@
                         if (adminPhoneInput) {
                             adminPhoneInput.value = result.data.profile.phonenumber || "";
                         }
+
+                        updateNavbarWelcomeName(result.data.profile.name || "");
                     }
                 })
                 .catch(function () {
@@ -1326,6 +1364,7 @@
                     }
 
                     var familyMember = result.data.family_member || {};
+                    updateNavbarWelcomeName(familyMember.name || "");
                     if (detailJob) {
                         detailJob.textContent = familyMember.job || "-";
                     }

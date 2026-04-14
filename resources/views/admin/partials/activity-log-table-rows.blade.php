@@ -24,6 +24,20 @@
             $targetRelationLabel = trim((string) ($context['target_relation_label'] ?? ''));
             $targetUsername = trim((string) ($context['target_username'] ?? ''));
             $newUsername = trim((string) ($context['username'] ?? ''));
+            $websiteNameOld = trim((string) ($context['website_name_old'] ?? ''));
+            $websiteNameNew = trim((string) ($context['website_name_new'] ?? ''));
+            $settingChanges = $context['changes'] ?? [];
+            $profileChanges = $context['changes'] ?? [];
+            $lifeStatusOld = trim((string) ($context['life_status_old'] ?? ''));
+            $lifeStatusNew = trim((string) ($context['life_status_new'] ?? ''));
+
+            $formatChangeValue = function (string $value): string {
+                return $value !== '' ? '"' . $value . '"' : '"empty"';
+            };
+
+            $formatTitleValue = function (string $value): string {
+                return $value !== '' ? '"' . ucfirst($value) . '"' : '"empty"';
+            };
 
             $genderToPartnerLabel = function (string $gender): string {
                 return $gender === 'female'
@@ -89,12 +103,43 @@
             $detailText = '-';
 
             if ($action === 'login') {
-                $targetUsername = (string) ($context['target_username'] ?? $actorName);
-                $detailText = 'User: ' . $targetUsername;
+                $detailText = 'Successful Log In';
             } elseif ($action === 'logout') {
-                $detailText = 'User: ' . $actorName;
+                $detailText = 'Logged Out';
             } elseif ($action === 'family.edit_profile' || $action === 'account.update_admin_profile') {
-                $detailText = 'Updated by: ' . $actorName;
+                if (is_array($profileChanges) && count($profileChanges) > 0) {
+                    $messages = [];
+                    foreach ($profileChanges as $change) {
+                        if (!is_array($change)) {
+                            continue;
+                        }
+
+                        $field = trim((string) ($change['field'] ?? 'profile'));
+                        $oldValue = trim((string) ($change['old'] ?? ''));
+                        $newValue = trim((string) ($change['new'] ?? ''));
+
+                        if ($field === 'profile picture') {
+                            if ($oldValue === '' && $newValue !== '') {
+                                $messages[] = 'Added profile picture';
+                            } elseif ($oldValue !== '' && $newValue === '') {
+                                $messages[] = 'Removed profile picture';
+                            } else {
+                                $messages[] = 'Updated profile picture';
+                            }
+                            continue;
+                        }
+
+                        $messages[] = 'Edited profile ' . $field . ' from ' . $formatChangeValue($oldValue) . ' to ' . $formatChangeValue($newValue);
+                    }
+
+                    if (count($messages) > 0) {
+                        $detailText = implode(', ', $messages);
+                    } else {
+                        $detailText = 'Updated by: ' . $actorName;
+                    }
+                } else {
+                    $detailText = 'Updated by: ' . $actorName;
+                }
             } elseif ($action === 'family.add_relationship') {
                 if ($relationType === 'partner') {
                     $partnerLabel = $newMemberGender === 'female'
@@ -120,32 +165,37 @@
                     $detailText = 'Permanently deleted: ' . $targetName;
                 }
             } elseif ($action === 'family.update_life_status') {
-                $lifeStatus = (string) ($context['life_status'] ?? '');
                 $targetText = $targetName !== '' ? $targetName : ($targetRelationLabel !== '' ? $targetRelationLabel : 'Member');
-                if ($lifeStatus !== '') {
-                    $detailText = $targetText . ' status: ' . ucfirst($lifeStatus);
+                if ($lifeStatusOld !== '' || $lifeStatusNew !== '') {
+                    $detailText = 'Changed ' . $targetText . ' life status from ' . $formatTitleValue($lifeStatusOld) . ' to ' . $formatTitleValue($lifeStatusNew);
                 } else {
                     $detailText = $targetText;
                 }
             } elseif ($action === 'management.create_user') {
                 if ($newUsername !== '') {
-                    $detailText = 'Username: ' . $newUsername;
+                    $detailText = 'Created user with username ' . $formatChangeValue($newUsername);
                 }
             } elseif ($action === 'management.reset_password') {
                 if ($targetUsername !== '') {
-                    $detailText = 'Reset: ' . $targetUsername;
+                    $detailText = 'Reset password for user ' . $formatChangeValue($targetUsername);
                 }
             } elseif ($action === 'management.delete_user') {
                 if ($targetUsername !== '') {
-                    $detailText = 'Deleted: ' . $targetUsername;
+                    $detailText = 'Deleted user ' . $formatChangeValue($targetUsername);
                 }
             } elseif ($action === 'management.restore_user') {
                 if ($targetUsername !== '') {
-                    $detailText = 'Restored: ' . $targetUsername;
+                    $detailText = 'Restored user ' . $formatChangeValue($targetUsername);
                 }
             } elseif ($action === 'management.force_delete_user') {
                 if ($targetUsername !== '') {
-                    $detailText = 'Permanently deleted: ' . $targetUsername;
+                    $detailText = 'Permanently deleted user ' . $formatChangeValue($targetUsername);
+                }
+            } elseif ($action === 'superadmin.update_setting') {
+                if (is_array($settingChanges) && count($settingChanges) > 0) {
+                    $detailText = implode(', ', array_map(static fn ($change) => (string) $change, $settingChanges));
+                } elseif ($websiteNameOld !== '' || $websiteNameNew !== '') {
+                    $detailText = 'Changed website name from ' . $formatChangeValue($websiteNameOld) . ' to ' . $formatChangeValue($websiteNameNew);
                 }
             }
 

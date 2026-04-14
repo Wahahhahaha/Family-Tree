@@ -1,6 +1,25 @@
 <?php $settings = $systemSettings ?? ['website_name' => 'Family Tree System', 'logo_path' => '']; ?>
 <?php $currentRoleId = (int) (session('authenticated_user.roleid') ?? 0); ?>
 <?php $canAccessManagement = in_array($currentRoleId, [1, 2, 3], true); ?>
+<?php
+    $currentUserId = (int) (session('authenticated_user.userid') ?? 0);
+    $welcomeName = '';
+
+    if ($currentUserId !== 0) {
+        $employerName = \Illuminate\Support\Facades\DB::table('employer')
+            ->where('userid', $currentUserId)
+            ->value('name');
+        $familyName = \Illuminate\Support\Facades\DB::table('family_member')
+            ->where('userid', $currentUserId)
+            ->value('name');
+
+        $welcomeName = trim((string) ($employerName ?? $familyName ?? ''));
+    }
+
+    if ($welcomeName === '') {
+        $welcomeName = (string) (session('authenticated_user.username') ?? '');
+    }
+?>
 <header class="topbar">
     <div class="brand">
 
@@ -39,7 +58,7 @@
         <div class="menu-dropdown profile-dropdown">
             <button class="btn btn-ghost dropdown-toggle profile-toggle" type="button" data-dropdown-toggle aria-expanded="false">
                 <span class="welcome-label">Welcome,</span>
-                <strong><?php echo e(session('authenticated_user.username')); ?></strong>
+                <strong id="navbarWelcomeName"><?php echo e($welcomeName); ?></strong>
             </button>
             <div class="dropdown-menu dropdown-menu-right" data-dropdown-menu>
                 <a href="/account" class="dropdown-item">Account</a>

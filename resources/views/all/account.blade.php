@@ -106,6 +106,49 @@
                 <input id="profilePictureInput" type="file" name="picture" accept="image/*" class="hidden">
 
                 <div class="settings-field">
+                    <label for="accountFamilyUsername">Username</label>
+                    <input id="accountFamilyUsername" type="text" value="<?php echo e(session('authenticated_user.username')); ?>" disabled>
+                    <small>Username cannot be edited.</small>
+                </div>
+
+                <div class="settings-field">
+                    <label for="accountFamilyName">Name</label>
+                    <input id="accountFamilyName" type="text" name="name" value="<?php echo e(old('name', $currentFamilyProfile->name ?? '')); ?>" placeholder="Enter your full name">
+                </div>
+
+                <div class="settings-field">
+                    <label for="accountFamilyEmail">Email</label>
+                    <input id="accountFamilyEmail" type="email" name="email" value="<?php echo e(old('email', $currentFamilyProfile->email ?? '')); ?>" placeholder="Enter your email">
+                </div>
+
+                <div class="settings-field">
+                    <label for="accountFamilyPhone">Phone Number</label>
+                    <input id="accountFamilyPhone" type="text" name="phonenumber" value="<?php echo e(old('phonenumber', $currentFamilyProfile->phonenumber ?? '')); ?>" placeholder="Enter your phone number">
+                </div>
+
+                <div class="settings-field">
+                    <label for="accountFamilyGender">Gender</label>
+                    <select id="accountFamilyGender" disabled>
+                        <option value="">-</option>
+                        <option value="male" <?php echo e(old('gender', $currentFamilyProfile->gender ?? '') === 'male' ? 'selected' : ''); ?>>Male</option>
+                        <option value="female" <?php echo e(old('gender', $currentFamilyProfile->gender ?? '') === 'female' ? 'selected' : ''); ?>>Female</option>
+                    </select>
+                    <small>Gender cannot be edited.</small>
+                </div>
+
+                <div class="settings-field">
+                    <label for="accountFamilyBirthdate">Date of Birth</label>
+                    <input id="accountFamilyBirthdate" type="date" value="<?php echo e(old('birthdate', $currentFamilyProfile->birthdate ?? '')); ?>" disabled>
+                    <small>Date of birth cannot be edited.</small>
+                </div>
+
+                <div class="settings-field">
+                    <label for="accountFamilyBirthplace">Birthplace</label>
+                    <input id="accountFamilyBirthplace" type="text" value="<?php echo e(old('birthplace', $currentFamilyProfile->birthplace ?? '')); ?>" disabled>
+                    <small>Birthplace cannot be edited.</small>
+                </div>
+
+                <div class="settings-field">
                     <label for="accountJob">Job</label>
                     <input id="accountJob" type="text" name="job" value="<?php echo e(old('job', $currentFamilyProfile->job ?? '')); ?>" placeholder="Example: Software Engineer">
                 </div>

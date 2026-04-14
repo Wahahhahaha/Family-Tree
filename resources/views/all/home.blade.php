@@ -14,12 +14,17 @@
         $canAddMemberFromHome = $currentRoleId === 3 || $currentLevelId === 2;
         $activePanel = old('home_panel', 'profile');
         $currentMemberHasPartner = (bool) ($currentMemberHasPartner ?? false);
-        $showFullTree = (bool) ($showFullTree ?? false);
-        $hasHiddenTreeLevels = (bool) ($hasHiddenTreeLevels ?? false);
+        $showUpperTree = (bool) ($showUpperTree ?? false);
+        $showLowerTree = (bool) ($showLowerTree ?? false);
+        $hasHiddenUpperTreeLevels = (bool) ($hasHiddenUpperTreeLevels ?? false);
+        $hasHiddenLowerTreeLevels = (bool) ($hasHiddenLowerTreeLevels ?? false);
         $treeSummaryText = (string) ($treeSummaryText ?? '');
-        $toggleTreeUrl = $showFullTree
-            ? request()->url()
-            : request()->fullUrlWithQuery(['show_full_tree' => 1]);
+        $toggleUpperTreeUrl = $showUpperTree
+            ? request()->fullUrlWithQuery(['show_upper_tree' => 0])
+            : request()->fullUrlWithQuery(['show_upper_tree' => 1]);
+        $toggleLowerTreeUrl = $showLowerTree
+            ? request()->fullUrlWithQuery(['show_lower_tree' => 0])
+            : request()->fullUrlWithQuery(['show_lower_tree' => 1]);
         $defaultRelationType = old('relation_type', 'child');
         $defaultChildParentingMode = old('child_parenting_mode', $currentMemberHasPartner ? 'with_current_partner' : 'single_parent');
         if (!$currentMemberHasPartner && $defaultChildParentingMode === 'with_current_partner') {
@@ -109,25 +114,16 @@
                     <p id="treeSummaryText"><?php echo e($treeSummaryText); ?></p>
                 </div>
                 <div class="tree-tools">
-                    <?php if ($hasHiddenTreeLevels): ?>
-                        <button
-                            type="button"
-                            id="treeToggleTopBtn"
-                            data-tree-toggle-url="<?php echo e($toggleTreeUrl); ?>"
-                            data-show-full="<?php echo e($showFullTree ? '1' : '0'); ?>"
-                            class="btn btn-ghost tree-expand-toggle"
-                        >
-                            <?php echo e($showFullTree ? 'Show less' : 'View more'); ?>
-                        </button>
-                    <?php else: ?>
-                        <button
-                            type="button"
-                            id="treeToggleTopBtn"
-                            class="btn btn-ghost tree-expand-toggle hidden"
-                        >
-                            View more
-                        </button>
-                    <?php endif; ?>
+                    <button
+                        type="button"
+                        id="treeToggleTopBtn"
+                        data-tree-toggle-url="<?php echo e($toggleUpperTreeUrl); ?>"
+                        data-tree-direction="upper"
+                        data-tree-expanded="<?php echo e($showUpperTree ? '1' : '0'); ?>"
+                        class="btn btn-ghost tree-expand-toggle <?php echo e(($hasHiddenUpperTreeLevels || $showUpperTree) ? '' : 'hidden'); ?>"
+                    >
+                        <?php echo e($showUpperTree ? 'Show less' : 'View more'); ?>
+                    </button>
                     <button id="saveTreeImageBtn" class="btn btn-soft" type="button">Save Image</button>
                     <div class="tree-zoom-controls">
                         <button id="treeZoomOutBtn" class="btn btn-ghost tree-zoom-btn" type="button" aria-label="Zoom out">-</button>
@@ -149,28 +145,18 @@
                 ]); ?>
             </div>
 
-            <?php if ($hasHiddenTreeLevels): ?>
-                <div class="tree-tools tree-tools-secondary" id="treeToggleBottomWrap">
-                    <button
-                        type="button"
-                        id="treeToggleBottomBtn"
-                        data-tree-toggle-url="<?php echo e($toggleTreeUrl); ?>"
-                        data-show-full="<?php echo e($showFullTree ? '1' : '0'); ?>"
-                        class="btn btn-ghost tree-expand-toggle"
-                    >
-                        <?php echo e($showFullTree ? 'Show less' : 'View more'); ?>
-                    </button>
-                </div>
-            <?php else: ?>
-                <div class="tree-tools tree-tools-secondary hidden" id="treeToggleBottomMirrorWrap">
-                    <button
-                        type="button"
-                        class="btn btn-ghost tree-expand-toggle"
-                    >
-                        View more
-                    </button>
-                </div>
-            <?php endif; ?>
+            <div class="tree-tools tree-tools-secondary <?php echo e(($hasHiddenLowerTreeLevels || $showLowerTree) ? '' : 'hidden'); ?>" id="treeToggleBottomWrap">
+                <button
+                    type="button"
+                    id="treeToggleBottomBtn"
+                    data-tree-toggle-url="<?php echo e($toggleLowerTreeUrl); ?>"
+                    data-tree-direction="lower"
+                    data-tree-expanded="<?php echo e($showLowerTree ? '1' : '0'); ?>"
+                    class="btn btn-ghost tree-expand-toggle"
+                >
+                    <?php echo e($showLowerTree ? 'Show less' : 'View more'); ?>
+                </button>
+            </div>
         </div>
 
         <aside class="detail">

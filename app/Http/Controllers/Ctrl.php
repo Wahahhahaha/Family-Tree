@@ -266,6 +266,19 @@ class Ctrl extends Controller
             return $count;
         };
 
+        $resolveSiblingKind = function (int $siblingId, array $myParents) use ($parentsOf, $countSharedParents): ?string {
+            $siblingParents = $parentsOf($siblingId);
+            $sharedParentCount = $countSharedParents($myParents, $siblingParents);
+            if ($sharedParentCount >= 2) {
+                return 'full';
+            }
+            if ($sharedParentCount === 1) {
+                return 'half';
+            }
+
+            return null;
+        };
+
         foreach ($familyMembers as $member) {
             $targetId = (int) $member->memberid;
 
@@ -398,6 +411,22 @@ class Ctrl extends Controller
             }
             if (isset($inLawParents[$targetId])) {
                 $relationLabels[$targetId] = $genderLabel($targetId, 'Father in law', 'Mother in law', 'Parent in law');
+                continue;
+            }
+
+            $inLawParentSiblings = [];
+            foreach (array_keys($inLawParents) as $inLawParentId) {
+                foreach ($parentsOf((int) $inLawParentId) as $grandInLawParentId) {
+                    foreach ($childrenOf((int) $grandInLawParentId) as $inLawParentSiblingId) {
+                        $inLawParentSiblingId = (int) $inLawParentSiblingId;
+                        if ($inLawParentSiblingId !== (int) $inLawParentId) {
+                            $inLawParentSiblings[$inLawParentSiblingId] = true;
+                        }
+                    }
+                }
+            }
+            if (isset($inLawParentSiblings[$targetId])) {
+                $relationLabels[$targetId] = $genderLabel($targetId, 'Uncle in law', 'Aunt in law', 'Relative in law');
                 continue;
             }
 
@@ -547,9 +576,11 @@ class Ctrl extends Controller
             }
 
             $isNephewNiece = false;
+            $isHalfNephewNiece = false;
             foreach (array_keys($mySiblings) as $siblingId) {
                 if (in_array($targetId, $childrenOf((int) $siblingId), true)) {
                     $isNephewNiece = true;
+                    $isHalfNephewNiece = $resolveSiblingKind((int) $siblingId, $myParents) === 'half';
                     break;
                 }
             }
@@ -562,21 +593,69 @@ class Ctrl extends Controller
                 }
             }
             if ($isNephewNiece) {
-                $relationLabels[$targetId] = $genderLabel($targetId, 'Nephew', 'Niece', 'Relative');
+                if ($isHalfNephewNiece) {
+                    $relationLabels[$targetId] = $genderLabel($targetId, 'Half Nephew', 'Half Niece', 'Half Relative');
+                } else {
+                    $relationLabels[$targetId] = $genderLabel($targetId, 'Nephew', 'Niece', 'Relative');
+                }
                 continue;
             }
 
             $isNephewNieceInLaw = false;
+            $isHalfNephewNieceInLaw = false;
             foreach (array_keys($mySiblings) as $siblingId) {
                 foreach ($childrenOf((int) $siblingId) as $siblingChildId) {
                     if (in_array($targetId, $partnerMap[(int) $siblingChildId] ?? [], true)) {
                         $isNephewNieceInLaw = true;
+                        $isHalfNephewNieceInLaw = $resolveSiblingKind((int) $siblingId, $myParents) === 'half';
                         break 2;
                     }
                 }
             }
             if ($isNephewNieceInLaw) {
-                $relationLabels[$targetId] = $genderLabel($targetId, 'Nephew in law', 'Niece in law', 'Relative in law');
+                if ($isHalfNephewNieceInLaw) {
+                    $relationLabels[$targetId] = $genderLabel($targetId, 'Half Nephew in law', 'Half Niece in law', 'Half Relative in law');
+                } else {
+                    $relationLabels[$targetId] = $genderLabel($targetId, 'Nephew in law', 'Niece in law', 'Relative in law');
+                }
+                continue;
+            }
+
+            $isGrandNephewNiece = false;
+            foreach (array_keys($mySiblings) as $siblingId) {
+                if ($resolveSiblingKind((int) $siblingId, $myParents) !== 'half') {
+                    continue;
+                }
+
+                foreach ($childrenOf((int) $siblingId) as $siblingChildId) {
+                    if (in_array($targetId, $childrenOf((int) $siblingChildId), true)) {
+                        $isGrandNephewNiece = true;
+                        break 2;
+                    }
+                }
+            }
+            if ($isGrandNephewNiece) {
+                $relationLabels[$targetId] = $genderLabel($targetId, 'Grandnephew', 'Grandniece', 'Grand Relative');
+                continue;
+            }
+
+            $isGrandNephewNieceInLaw = false;
+            foreach (array_keys($mySiblings) as $siblingId) {
+                if ($resolveSiblingKind((int) $siblingId, $myParents) !== 'half') {
+                    continue;
+                }
+
+                foreach ($childrenOf((int) $siblingId) as $siblingChildId) {
+                    foreach ($childrenOf((int) $siblingChildId) as $grandSiblingChildId) {
+                        if (in_array($targetId, $partnerMap[(int) $grandSiblingChildId] ?? [], true)) {
+                            $isGrandNephewNieceInLaw = true;
+                            break 3;
+                        }
+                    }
+                }
+            }
+            if ($isGrandNephewNieceInLaw) {
+                $relationLabels[$targetId] = $genderLabel($targetId, 'Grandnephew-in-law', 'Grandniece-in-law', 'Grand Relative in law');
                 continue;
             }
 
@@ -732,27 +811,55 @@ class Ctrl extends Controller
         };
 
         $fullTreeRoots = $buildTreeRoots();
+        $showUpperTree = $request->boolean('show_upper_tree');
+        $showLowerTree = $request->boolean('show_lower_tree');
+        $visibleMinGeneration = $showUpperTree ? null : -2;
+        $visibleMaxGeneration = $showLowerTree ? null : 2;
+        $hasHiddenUpperTreeLevels = false;
+        $hasHiddenLowerTreeLevels = false;
+
         $limitedMemberIds = $familyMembers
             ->pluck('memberid')
-            ->filter(function ($memberId) use ($generationMap, $currentMemberId) {
+            ->filter(function ($memberId) use ($generationMap, $currentMemberId, $visibleMinGeneration, $visibleMaxGeneration, &$hasHiddenUpperTreeLevels, &$hasHiddenLowerTreeLevels) {
                 $memberId = (int) $memberId;
                 if ($currentMemberId === 0 || !array_key_exists($memberId, $generationMap)) {
                     return true;
                 }
 
                 $generation = (int) $generationMap[$memberId];
-                return $generation >= -2 && $generation <= 2;
+                if ($visibleMinGeneration !== null && $generation < $visibleMinGeneration) {
+                    $hasHiddenUpperTreeLevels = true;
+                    return false;
+                }
+
+                if ($visibleMaxGeneration !== null && $generation > $visibleMaxGeneration) {
+                    $hasHiddenLowerTreeLevels = true;
+                    return false;
+                }
+
+                return true;
             })
             ->values()
             ->all();
-        $limitedTreeRoots = $buildTreeRoots($limitedMemberIds);
-        $showFullTree = $request->boolean('show_full_tree');
-        $treeRoots = $showFullTree ? $fullTreeRoots : $limitedTreeRoots;
-        $hasHiddenTreeLevels = count($limitedMemberIds) < $familyMembers->count();
+        $treeRoots = $buildTreeRoots($limitedMemberIds);
 
-        $treeSummaryText = $showFullTree
-            ? 'Showing full family tree.'
-            : 'Showing members from your grandparents to your grandchildren.';
+        if ($showUpperTree) {
+            $hasHiddenUpperTreeLevels = false;
+        }
+
+        if ($showLowerTree) {
+            $hasHiddenLowerTreeLevels = false;
+        }
+
+        if ($showUpperTree && $showLowerTree) {
+            $treeSummaryText = 'Showing full family tree.';
+        } elseif ($showUpperTree) {
+            $treeSummaryText = 'Showing full family tree above grandparent level and up to your grandchildren below.';
+        } elseif ($showLowerTree) {
+            $treeSummaryText = 'Showing from your grandparents down to the full descendant tree below your grandchildren.';
+        } else {
+            $treeSummaryText = 'Showing members from your grandparents to your grandchildren.';
+        }
 
         if (($request->ajax() || $request->expectsJson()) && $request->boolean('tree_section')) {
             return response()->json([
@@ -765,11 +872,16 @@ class Ctrl extends Controller
                     'canDeleteChildMap' => $canDeleteChildMap,
                     'canUpdateLifeStatusMap' => $canUpdateLifeStatusMap,
                 ])->render(),
-                'show_full_tree' => $showFullTree,
-                'has_hidden_tree_levels' => $hasHiddenTreeLevels,
-                'toggle_tree_url' => $showFullTree
-                    ? $request->url()
-                    : $request->fullUrlWithQuery(['show_full_tree' => 1]),
+                'show_upper_tree' => $showUpperTree,
+                'show_lower_tree' => $showLowerTree,
+                'has_hidden_upper_tree_levels' => $hasHiddenUpperTreeLevels,
+                'has_hidden_lower_tree_levels' => $hasHiddenLowerTreeLevels,
+                'toggle_upper_tree_url' => $showUpperTree
+                    ? $request->fullUrlWithQuery(['show_upper_tree' => 0])
+                    : $request->fullUrlWithQuery(['show_upper_tree' => 1]),
+                'toggle_lower_tree_url' => $showLowerTree
+                    ? $request->fullUrlWithQuery(['show_lower_tree' => 0])
+                    : $request->fullUrlWithQuery(['show_lower_tree' => 1]),
                 'summary_text' => $treeSummaryText,
             ]);
         }
@@ -789,8 +901,10 @@ class Ctrl extends Controller
             'familyMembers',
             'currentFamilyProfile',
             'treeRoots',
-            'showFullTree',
-            'hasHiddenTreeLevels',
+            'showUpperTree',
+            'showLowerTree',
+            'hasHiddenUpperTreeLevels',
+            'hasHiddenLowerTreeLevels',
             'treeSummaryText',
             'relationLabels',
             'currentMemberHasPartner',
@@ -870,11 +984,16 @@ class Ctrl extends Controller
         $familyMember = DB::table('family_member')
             ->where('userid', $user->userid)
             ->first();
+        $displayName = trim((string) ($employer->name ?? $familyMember->name ?? ''));
+        if ($displayName === '') {
+            $displayName = (string) $user->username;
+        }
 
         $request->session()->regenerate();
         $request->session()->put('authenticated_user', [
             'userid' => $user->userid,
             'username' => $user->username,
+            'name' => $displayName,
             'levelid' => $user->levelid,
             'levelname' => $level->levelname ?? null,
             'roleid' => $employer->roleid ?? null,
@@ -1422,26 +1541,61 @@ class Ctrl extends Controller
         }
 
         $validated = $validator->validated();
+        $oldName = trim((string) ($employer->name ?? ''));
+        $oldEmail = strtolower(trim((string) ($employer->email ?? '')));
+        $oldPhoneNumber = trim((string) ($employer->phonenumber ?? ''));
+        $newName = trim((string) $validated['name']);
+        $newEmail = strtolower(trim((string) $validated['email']));
+        $newPhoneNumber = trim((string) $validated['phonenumber']);
 
         DB::table('employer')
             ->where('userid', $currentUserId)
             ->update([
-                'name' => trim((string) $validated['name']),
-                'email' => strtolower(trim((string) $validated['email'])),
-                'phonenumber' => trim((string) $validated['phonenumber']),
+                'name' => $newName,
+                'email' => $newEmail,
+                'phonenumber' => $newPhoneNumber,
             ]);
 
-        $this->logActivity($request, 'account.update_admin_profile', [
-            'userid' => $currentUserId,
-        ]);
+        $activityChanges = [];
+
+        if ($oldName !== $newName) {
+            $activityChanges[] = [
+                'field' => 'name',
+                'old' => $oldName,
+                'new' => $newName,
+            ];
+        }
+
+        if ($oldEmail !== $newEmail) {
+            $activityChanges[] = [
+                'field' => 'email',
+                'old' => $oldEmail,
+                'new' => $newEmail,
+            ];
+        }
+
+        if ($oldPhoneNumber !== $newPhoneNumber) {
+            $activityChanges[] = [
+                'field' => 'phone number',
+                'old' => $oldPhoneNumber,
+                'new' => $newPhoneNumber,
+            ];
+        }
+
+        if (count($activityChanges) > 0) {
+            $this->logActivity($request, 'account.update_admin_profile', [
+                'userid' => $currentUserId,
+                'changes' => $activityChanges,
+            ]);
+        }
 
         if ($request->ajax() || $request->expectsJson()) {
             return response()->json([
                 'message' => 'Profile updated successfully.',
                 'profile' => [
-                    'name' => trim((string) $validated['name']),
-                    'email' => strtolower(trim((string) $validated['email'])),
-                    'phonenumber' => trim((string) $validated['phonenumber']),
+                    'name' => $newName,
+                    'email' => $newEmail,
+                    'phonenumber' => $newPhoneNumber,
                 ],
             ]);
         }
@@ -1921,11 +2075,18 @@ class Ctrl extends Controller
         }
 
         $validated = $request->validate([
+            'name' => ['nullable', 'string', 'max:255'],
+            'email' => ['nullable', 'email', 'max:255'],
+            'phonenumber' => ['nullable', 'string', 'max:255'],
             'job' => ['nullable', 'string', 'max:255'],
             'address' => ['nullable', 'string', 'max:255'],
             'education_status' => ['nullable', 'string', 'max:255'],
             'picture' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp,gif', 'max:2048'],
         ], [
+            'name.max' => 'Name max length is 255 characters.',
+            'email.email' => 'Email format is invalid.',
+            'email.max' => 'Email max length is 255 characters.',
+            'phonenumber.max' => 'Phone number max length is 255 characters.',
             'job.max' => 'Job max length is 255 characters.',
             'address.max' => 'Address max length is 255 characters.',
             'education_status.max' => 'Education max length is 255 characters.',
@@ -1934,10 +2095,27 @@ class Ctrl extends Controller
             'picture.max' => 'Profile picture max size is 2MB.',
         ]);
 
+        $oldName = trim((string) ($familyMember->name ?? ''));
+        $oldEmail = strtolower(trim((string) ($familyMember->email ?? '')));
+        $oldPhoneNumber = trim((string) ($familyMember->phonenumber ?? ''));
+        $oldJob = trim((string) ($familyMember->job ?? ''));
+        $oldAddress = trim((string) ($familyMember->address ?? ''));
+        $oldEducationStatus = trim((string) ($familyMember->education_status ?? ''));
+        $oldPicture = trim((string) ($familyMember->picture ?? ''));
+        $newName = trim((string) ($validated['name'] ?? ''));
+        $newEmail = strtolower(trim((string) ($validated['email'] ?? '')));
+        $newPhoneNumber = trim((string) ($validated['phonenumber'] ?? ''));
+        $newJob = trim((string) ($validated['job'] ?? ''));
+        $newAddress = trim((string) ($validated['address'] ?? ''));
+        $newEducationStatus = trim((string) ($validated['education_status'] ?? ''));
+
         $updatePayload = [
-            'job' => $validated['job'] ?? null,
-            'address' => $validated['address'] ?? null,
-            'education_status' => $validated['education_status'] ?? null,
+            'name' => $newName !== '' ? $newName : null,
+            'email' => $newEmail !== '' ? $newEmail : null,
+            'phonenumber' => $newPhoneNumber !== '' ? $newPhoneNumber : null,
+            'job' => $newJob !== '' ? $newJob : null,
+            'address' => $newAddress !== '' ? $newAddress : null,
+            'education_status' => $newEducationStatus !== '' ? $newEducationStatus : null,
         ];
 
         if ($request->hasFile('picture')) {
@@ -1963,14 +2141,76 @@ class Ctrl extends Controller
 
         $updatedFamilyMember = DB::table('family_member')
             ->where('userid', $currentUserId)
-            ->select('job', 'address', 'education_status', 'picture')
+            ->select('name', 'email', 'phonenumber', 'job', 'address', 'education_status', 'picture')
             ->first();
 
-        $this->logActivity($request, 'family.edit_profile', [
-            'userid' => $currentUserId,
-            'has_picture_upload' => $request->hasFile('picture'),
-            'redirect_to' => $redirectTo,
-        ]);
+        $activityChanges = [];
+
+        if ($oldName !== $newName) {
+            $activityChanges[] = [
+                'field' => 'name',
+                'old' => $oldName,
+                'new' => $newName,
+            ];
+        }
+
+        if ($oldEmail !== $newEmail) {
+            $activityChanges[] = [
+                'field' => 'email',
+                'old' => $oldEmail,
+                'new' => $newEmail,
+            ];
+        }
+
+        if ($oldPhoneNumber !== $newPhoneNumber) {
+            $activityChanges[] = [
+                'field' => 'phone number',
+                'old' => $oldPhoneNumber,
+                'new' => $newPhoneNumber,
+            ];
+        }
+
+        if ($oldJob !== $newJob) {
+            $activityChanges[] = [
+                'field' => 'job',
+                'old' => $oldJob,
+                'new' => $newJob,
+            ];
+        }
+
+        if ($oldAddress !== $newAddress) {
+            $activityChanges[] = [
+                'field' => 'address',
+                'old' => $oldAddress,
+                'new' => $newAddress,
+            ];
+        }
+
+        if ($oldEducationStatus !== $newEducationStatus) {
+            $activityChanges[] = [
+                'field' => 'education status',
+                'old' => $oldEducationStatus,
+                'new' => $newEducationStatus,
+            ];
+        }
+
+        $newPicture = trim((string) ($updatedFamilyMember->picture ?? ''));
+        if ($oldPicture !== $newPicture) {
+            $activityChanges[] = [
+                'field' => 'profile picture',
+                'old' => $oldPicture,
+                'new' => $newPicture,
+            ];
+        }
+
+        if (count($activityChanges) > 0) {
+            $this->logActivity($request, 'family.edit_profile', [
+                'userid' => $currentUserId,
+                'has_picture_upload' => $request->hasFile('picture'),
+                'redirect_to' => $redirectTo,
+                'changes' => $activityChanges,
+            ]);
+        }
 
         if ($request->ajax() || $request->expectsJson()) {
             return response()->json([
@@ -2443,7 +2683,7 @@ class Ctrl extends Controller
 
         $targetMember = DB::table('family_member')
             ->where('memberid', $targetMemberId)
-            ->select('name', 'gender')
+            ->select('name', 'gender', 'life_status')
             ->first();
 
         $nextLifeStatus = (string) $validated['life_status'];
@@ -2454,13 +2694,17 @@ class Ctrl extends Controller
                 'deaddate' => $nextLifeStatus === 'deceased' ? now()->toDateString() : null,
             ]);
 
-        $this->logActivity($request, 'family.update_life_status', [
-            'target_memberid' => $targetMemberId,
-            'target_name' => (string) ($targetMember->name ?? ''),
-            'target_gender' => (string) ($targetMember->gender ?? ''),
-            'target_relation_label' => $this->resolveActivityRelationLabel($currentMemberId, $targetMemberId),
-            'life_status' => $nextLifeStatus,
-        ]);
+        $previousLifeStatus = (string) ($targetMember->life_status ?? '');
+        if ($previousLifeStatus !== $nextLifeStatus) {
+            $this->logActivity($request, 'family.update_life_status', [
+                'target_memberid' => $targetMemberId,
+                'target_name' => (string) ($targetMember->name ?? ''),
+                'target_gender' => (string) ($targetMember->gender ?? ''),
+                'target_relation_label' => $this->resolveActivityRelationLabel($currentMemberId, $targetMemberId),
+                'life_status_old' => $previousLifeStatus,
+                'life_status_new' => $nextLifeStatus,
+            ]);
+        }
 
         return redirect('/')->with('success', 'Life status has been updated.');
     }
@@ -2514,6 +2758,8 @@ class Ctrl extends Controller
         ]);
 
         $settings = $this->getSystemSettings();
+        $oldWebsiteName = (string) ($settings['website_name'] ?? '');
+        $oldLogoPath = (string) ($settings['logo_path'] ?? '');
         $settings['website_name'] = $validated['website_name'];
 
         if ($request->hasFile('logo')) {
@@ -2535,10 +2781,27 @@ class Ctrl extends Controller
 
         $this->saveSystemSettings($settings);
 
-        $this->logActivity($request, 'superadmin.update_setting', [
-            'website_name' => (string) $settings['website_name'],
-            'has_logo' => !empty($settings['logo_path']),
-        ]);
+        $activityChanges = [];
+
+        if ($oldWebsiteName !== (string) $settings['website_name']) {
+            $activityChanges[] = 'Changed website name from "' . ($oldWebsiteName !== '' ? $oldWebsiteName : 'empty') . '" to "' . ((string) $settings['website_name'] !== '' ? (string) $settings['website_name'] : 'empty') . '"';
+        }
+
+        if ($oldLogoPath !== (string) ($settings['logo_path'] ?? '')) {
+            $activityChanges[] = empty($oldLogoPath)
+                ? 'Added website logo'
+                : 'Changed website logo';
+        }
+
+        if (count($activityChanges) > 0) {
+            $this->logActivity($request, 'superadmin.update_setting', [
+                'website_name_old' => $oldWebsiteName,
+                'website_name_new' => (string) $settings['website_name'],
+                'logo_path_old' => $oldLogoPath,
+                'logo_path_new' => (string) ($settings['logo_path'] ?? ''),
+                'changes' => $activityChanges,
+            ]);
+        }
 
         if ($request->ajax() || $request->expectsJson()) {
             return response()->json([
