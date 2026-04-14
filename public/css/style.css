@@ -1605,6 +1605,20 @@
     display: inline-flex;
     align-items: center;
     gap: 8px;
+    flex-wrap: wrap;
+}
+
+.page-family-tree .btn-export {
+    color: #ffffff;
+    background: linear-gradient(120deg, #159a6f, #27c08a);
+    box-shadow: 0 8px 18px rgba(21, 154, 111, 0.22);
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+}
+
+.page-family-tree .btn-export:hover {
+    filter: brightness(1.04);
 }
 
 .page-family-tree .table-wrap {
@@ -2065,6 +2079,10 @@
 .page-family-tree .modal-field select:focus {
     border-color: var(--primary);
     box-shadow: 0 0 0 4px rgba(31, 154, 214, 0.15);
+}
+
+.page-family-tree .modal-field-full {
+    grid-column: 1 / -1;
 }
 
 .page-family-tree .modal-actions {

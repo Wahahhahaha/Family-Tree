@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\UsersExport;
+use App\Imports\UsersImport;
 use Carbon\Carbon;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Http\Request;
@@ -14,6 +16,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Maatwebsite\Excel\Facades\Excel;
 
 class Ctrl extends Controller
 {
@@ -1663,6 +1666,70 @@ class Ctrl extends Controller
         ]);
         echo view('admin.user-management', compact('users', 'levels', 'roles', 'systemSettings'));
         echo view('all.footer');
+    }
+
+    public function exportUsers(Request $request)
+    {
+        if (!$request->session()->has('authenticated_user')) {
+            return redirect('/login');
+        }
+
+        $currentRoleId = (int) session('authenticated_user.roleid');
+        $allowedRoles = [1, 2, 3];
+        $isFamilyHead = $currentRoleId === 3;
+
+        if (!in_array($currentRoleId, $allowedRoles, true)) {
+            return redirect('/')->with('error', 'You do not have permission to export users.');
+        }
+
+        $fileName = 'users-' . now()->format('Ymd-His') . '.xlsx';
+        return Excel::download(new UsersExport($isFamilyHead), $fileName);
+    }
+
+    public function importUsers(Request $request)
+    {
+        if (!$request->session()->has('authenticated_user')) {
+            return redirect('/login');
+        }
+
+        $currentRoleId = (int) session('authenticated_user.roleid');
+        $allowedRoles = [1, 2, 3];
+
+        if (!in_array($currentRoleId, $allowedRoles, true)) {
+            return redirect('/')->with('error', 'You do not have permission to import users.');
+        }
+
+        $validator = Validator::make($request->all(), [
+            'import_file' => ['required', 'file', 'mimes:xlsx', 'max:5120'],
+        ], [
+            'import_file.required' => 'Please choose an Excel file first.',
+            'import_file.file' => 'Uploaded file is invalid.',
+            'import_file.mimes' => 'File must be .xlsx format.',
+            'import_file.max' => 'Maximum file size is 5MB.',
+        ]);
+
+        if ($validator->fails()) {
+            return redirect('/management/users')
+                ->withErrors($validator, 'userImport')
+                ->with('openImportModal', true);
+        }
+
+        try {
+            $import = new UsersImport();
+            Excel::import($import, $request->file('import_file'));
+
+            $message = 'Import completed. Added ' . $import->getImportedCount() . ' user(s)';
+            if ($import->getSkippedCount() > 0) {
+                $message .= ', skipped ' . $import->getSkippedCount() . ' row(s).';
+            } else {
+                $message .= '.';
+            }
+
+            return redirect('/management/users')->with('success', $message);
+        } catch (\Throwable $e) {
+            return redirect('/management/users')
+                ->with('error', 'Failed to import users. Please check file format and template.');
+        }
     }
 
     public function activityLog(Request $request)

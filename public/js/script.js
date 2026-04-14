@@ -9,6 +9,10 @@
     var openAddUserModal = document.getElementById("openAddUserModal");
     var closeAddUserModal = document.getElementById("closeAddUserModal");
     var cancelAddUserModal = document.getElementById("cancelAddUserModal");
+    var importUserModal = document.getElementById("importUserModal");
+    var openImportUserModal = document.getElementById("openImportUserModal");
+    var closeImportUserModal = document.getElementById("closeImportUserModal");
+    var cancelImportUserModal = document.getElementById("cancelImportUserModal");
     var newLevelSelect = document.getElementById("newLevel");
     var dynamicFields = document.getElementById("dynamicFields");
     var newRoleSelect = document.getElementById("newRole");
@@ -595,6 +599,38 @@
         document.addEventListener("keydown", function (event) {
             if (event.key === "Escape") {
                 closeModal();
+            }
+        });
+    }
+
+    if (importUserModal && openImportUserModal) {
+        var closeImportModal = function () {
+            importUserModal.classList.remove("open");
+            importUserModal.setAttribute("aria-hidden", "true");
+        };
+
+        openImportUserModal.addEventListener("click", function () {
+            importUserModal.classList.add("open");
+            importUserModal.setAttribute("aria-hidden", "false");
+        });
+
+        if (closeImportUserModal) {
+            closeImportUserModal.addEventListener("click", closeImportModal);
+        }
+
+        if (cancelImportUserModal) {
+            cancelImportUserModal.addEventListener("click", closeImportModal);
+        }
+
+        importUserModal.addEventListener("click", function (event) {
+            if (event.target === importUserModal) {
+                closeImportModal();
+            }
+        });
+
+        document.addEventListener("keydown", function (event) {
+            if (event.key === "Escape") {
+                closeImportModal();
             }
         });
     }

@@ -23,6 +23,9 @@ Route::post('/account/profile', 'App\Http\Controllers\Ctrl@updateEmployerProfile
 
 
 Route::get('/management/users', 'App\Http\Controllers\Ctrl@userManagement');
+Route::get('/management/user', 'App\Http\Controllers\Ctrl@userManagement');
+Route::get('/management/users/export', 'App\Http\Controllers\Ctrl@exportUsers');
+Route::post('/management/users/import', 'App\Http\Controllers\Ctrl@importUsers');
 Route::get('/management/activity-log', 'App\Http\Controllers\Ctrl@activityLog');
 Route::get('/management/recycle-bin', 'App\Http\Controllers\Ctrl@recycleBin');
 Route::post('/management/users/store', 'App\Http\Controllers\Ctrl@storeUser');

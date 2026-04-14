@@ -11,6 +11,8 @@
             </div>
             <div class="management-tools">
                 <span id="userTableCount" class="table-count">Total: <?php echo e($users->total()); ?> users</span>
+                <a href="/management/users/export" class="btn btn-export">Export .xlsx</a>
+                <button id="openImportUserModal" type="button" class="btn btn-ghost">Import</button>
                 <button id="openAddUserModal" type="button" class="btn btn-primary">Add User</button>
             </div>
         </div>
@@ -26,6 +28,14 @@
         <?php if ($errors->any()): ?>
             <div class="alert-error">
                 <?php foreach ($errors->all() as $error): ?>
+                    <div><?php echo e($error); ?></div>
+                <?php endforeach; ?>
+            </div>
+        <?php endif; ?>
+
+        <?php if ($errors->getBag('userImport')->any()): ?>
+            <div class="alert-error">
+                <?php foreach ($errors->getBag('userImport')->all() as $error): ?>
                     <div><?php echo e($error); ?></div>
                 <?php endforeach; ?>
             </div>
@@ -170,6 +180,30 @@
             <div class="modal-actions">
                 <button id="cancelAddUserModal" type="button" class="btn btn-ghost">Cancel</button>
                 <button type="submit" class="btn btn-primary">Save User</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="importUserModal" class="modal-backdrop<?php echo e((session('openImportModal') || $errors->getBag('userImport')->any()) ? ' open' : ''); ?>" aria-hidden="<?php echo e((session('openImportModal') || $errors->getBag('userImport')->any()) ? 'false' : 'true'); ?>">
+    <div class="modal-card">
+        <div class="modal-head">
+            <h3>Import Users</h3>
+            <button id="closeImportUserModal" type="button" class="modal-close" aria-label="Close modal">&times;</button>
+        </div>
+        <p class="modal-subtitle">Upload file Excel `.xlsx` untuk menambahkan data user secara massal.</p>
+
+        <form method="POST" action="/management/users/import" enctype="multipart/form-data" class="modal-form">
+            <?php echo csrf_field(); ?>
+
+            <div class="modal-field modal-field-full">
+                <label for="importUserFile">Excel File (.xlsx)</label>
+                <input id="importUserFile" name="import_file" type="file" accept=".xlsx" required>
+            </div>
+
+            <div class="modal-actions">
+                <button id="cancelImportUserModal" type="button" class="btn btn-ghost">Cancel</button>
+                <button type="submit" class="btn btn-primary">Import</button>
             </div>
         </form>
     </div>
