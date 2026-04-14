@@ -103,7 +103,24 @@
             return "To edit your profile: open the Account menu, update the required fields, then click Save Profile. You can also change your profile photo there.";
         }
 
-        if (hasAny(["how to change my password", "change my password", "forgot password", "lupa password", "reset password"])) {
+        if (hasAny([
+            "how to change my password",
+            "change my password",
+            "forgot password",
+            "forget password",
+            "forgat password",
+            "forgor password",
+            "forget pasword",
+            "forgot pasword",
+            "forgat pasword",
+            "forgor pasword",
+            "lupa pasword",
+            "lupa password",
+            "reset password",
+            "foregt pw",
+            "forget pw",
+            "forgot pw"
+        ])) {
             return "If you forgot your password: on the login page click Forgot Password, choose email or phone reset, then complete verification and save the new password.";
         }
 
@@ -157,6 +174,23 @@
             var question = btn.getAttribute("data-question") || "";
             sendMessage(question);
             input.focus();
+        });
+    });
+
+    var quickHeads = Array.prototype.slice.call(
+        document.querySelectorAll(".chatbot-quick-head")
+    );
+
+    quickHeads.forEach(function (head) {
+        head.addEventListener("click", function () {
+            var wrap = head.closest(".chatbot-quick-wrap");
+            if (!wrap) {
+                return;
+            }
+
+            wrap.classList.toggle("is-collapsed");
+            var expanded = !wrap.classList.contains("is-collapsed");
+            head.setAttribute("aria-expanded", expanded ? "true" : "false");
         });
     });
 })();

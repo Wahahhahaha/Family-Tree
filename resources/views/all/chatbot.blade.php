@@ -8,20 +8,27 @@
                 <p>Ask anything about how to use the Family Tree System.</p>
             </div>
 
-            <div class="chatbot-quick-wrap">
-                <p>Quick Questions</p>
-                <div class="chatbot-quick-list">
-                    <button type="button" class="chatbot-quick-btn" data-question="How to add child?">How to add child</button>
-                    <button type="button" class="chatbot-quick-btn" data-question="How to add partner?">How to add partner</button>
-                    <button type="button" class="chatbot-quick-btn" data-question="How to edit profile?">How to edit profile</button>
-                    <button type="button" class="chatbot-quick-btn" data-question="I forgot my password, what should I do?">Forgot password</button>
-                </div>
-            </div>
-
             <div class="chatbot-messages" id="chatbotMessages" aria-live="polite">
                 <div class="chatbot-msg chatbot-msg-bot">
                     <p>Hello, I am ready to help. Pick a quick question or type your own.</p>
                     <span>Just now</span>
+                </div>
+                <div class="chatbot-msg chatbot-msg-user chatbot-msg-quick">
+                    <div class="chatbot-quick-wrap">
+                        <button type="button" class="chatbot-quick-head" aria-expanded="true">
+                            <span class="chatbot-quick-title">
+                                <b>+</b>
+                                <strong>Quick Questions</strong>
+                            </span>
+                            <i>^</i>
+                        </button>
+                        <div class="chatbot-quick-list">
+                            <button type="button" class="chatbot-quick-btn" data-question="How to add child?">How to add a child?</button>
+                            <button type="button" class="chatbot-quick-btn" data-question="How to add partner?">How to add a partner?</button>
+                            <button type="button" class="chatbot-quick-btn" data-question="How to edit profile?">How to edit profile?</button>
+                            <button type="button" class="chatbot-quick-btn" data-question="forget password">Forget password</button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
