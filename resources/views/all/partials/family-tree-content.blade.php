@@ -6,6 +6,7 @@
     $canDeletePartnerMap = $canDeletePartnerMap ?? [];
     $canDeleteChildMap = $canDeleteChildMap ?? [];
     $canUpdateLifeStatusMap = $canUpdateLifeStatusMap ?? [];
+    $childParentingModeMap = $childParentingModeMap ?? [];
 ?>
 
 <?php if ($members->isEmpty()): ?>
@@ -22,6 +23,7 @@
                         'canDeletePartnerMap' => $canDeletePartnerMap,
                         'canDeleteChildMap' => $canDeleteChildMap,
                         'canUpdateLifeStatusMap' => $canUpdateLifeStatusMap,
+                        'childParentingModeMap' => $childParentingModeMap,
                         'maxVisibleDepth' => 99,
                         'depth' => 0,
                     ]); ?>

@@ -41,6 +41,8 @@ class UsersExport implements FromCollection, WithHeadings, WithMapping
                 'fm.life_status'
             );
 
+        $query->whereNull('u.deleted_at');
+
         if ($this->onlyFamilyUsers) {
             $query->where('u.levelid', 2);
         }

@@ -32,6 +32,7 @@ class Ctrl extends Controller
         $familyMembers = DB::table('user as u')
             ->join('family_member as fm', 'fm.userid', '=', 'u.userid')
             ->where('u.levelid', 2)
+            ->whereNull('u.deleted_at')
             ->select(
                 'u.userid',
                 'u.username',
@@ -72,10 +73,11 @@ class Ctrl extends Controller
 
         $membersById = $familyMembers->keyBy('memberid');
         $relationships = DB::table('relationship')
-            ->select('memberid', 'relatedmemberid', 'relationtype')
+            ->select('memberid', 'relatedmemberid', 'relationtype', 'child_parenting_mode')
             ->get();
 
         $childrenMap = [];
+        $childParentingModeMap = [];
         $partnerMap = [];
         $parentMap = [];
         $parentCount = [];
@@ -84,6 +86,7 @@ class Ctrl extends Controller
             $from = (int) $relation->memberid;
             $to = (int) $relation->relatedmemberid;
             $type = strtolower((string) $relation->relationtype);
+            $parentingMode = (string) ($relation->child_parenting_mode ?? 'with_current_partner');
 
             if (!isset($membersById[$from]) || !isset($membersById[$to])) {
                 continue;
@@ -93,6 +96,7 @@ class Ctrl extends Controller
                 $childrenMap[$from] = $childrenMap[$from] ?? [];
                 if (!in_array($to, $childrenMap[$from], true)) {
                     $childrenMap[$from][] = $to;
+                    $childParentingModeMap[$from][$to] = $parentingMode;
                     $parentMap[$to] = $parentMap[$to] ?? [];
                     if (!in_array($from, $parentMap[$to], true)) {
                         $parentMap[$to][] = $from;
@@ -553,14 +557,25 @@ class Ctrl extends Controller
             }
 
             $myCousins = [];
+            $myFirstCousinParentSiblingId = null;
             foreach (array_keys($myParentSiblings) as $parentSiblingId) {
                 if (in_array($targetId, $childrenOf((int) $parentSiblingId), true)) {
                     $myCousins[$targetId] = true;
+                    $myFirstCousinParentSiblingId = (int) $parentSiblingId;
+                    break;
                 }
             }
 
             if (isset($myCousins[$targetId])) {
-                $relationLabels[$targetId] = 'Cousin';
+                // Check if cousin is from a half-sibling of parent for more accurate labeling
+                $isFirstCousinFromHalfSibling = false;
+                if ($myFirstCousinParentSiblingId !== null) {
+                    $cousinParentSiblingParents = $parentsOf($myFirstCousinParentSiblingId);
+                    $siblingKind = $resolveSiblingKind($myFirstCousinParentSiblingId, $myParents);
+                    $isFirstCousinFromHalfSibling = ($siblingKind === 'half');
+                }
+                
+                $relationLabels[$targetId] = 'First Cousin';
                 continue;
             }
 
@@ -574,7 +589,7 @@ class Ctrl extends Controller
                 }
             }
             if ($isCousinInLaw) {
-                $relationLabels[$targetId] = 'Cousin in law';
+                $relationLabels[$targetId] = 'First Cousin In Law';
                 continue;
             }
 
@@ -874,6 +889,7 @@ class Ctrl extends Controller
                     'canDeletePartnerMap' => $canDeletePartnerMap,
                     'canDeleteChildMap' => $canDeleteChildMap,
                     'canUpdateLifeStatusMap' => $canUpdateLifeStatusMap,
+                    'childParentingModeMap' => $childParentingModeMap,
                 ])->render(),
                 'show_upper_tree' => $showUpperTree,
                 'show_lower_tree' => $showLowerTree,
@@ -913,7 +929,8 @@ class Ctrl extends Controller
             'currentMemberHasPartner',
             'canDeletePartnerMap',
             'canDeleteChildMap',
-            'canUpdateLifeStatusMap'
+            'canUpdateLifeStatusMap',
+            'childParentingModeMap'
         ));
         echo view('all.footer');
     }
@@ -1620,7 +1637,7 @@ class Ctrl extends Controller
             return redirect('/')->with('error', 'You do not have permission to access user management.');
         }
 
-        $usersQuery = $this->usersQuery();
+        $usersQuery = $this->usersQuery()->whereNull('u.deleted_at');
         if ($isFamilyHead) {
             $usersQuery->where('u.levelid', 2);
         }
@@ -1787,13 +1804,26 @@ class Ctrl extends Controller
             return redirect('/management/users')->with('error', 'Only superadmin can access recycle bin.');
         }
 
+        $deletedUsersQuery = $this->usersQuery()->whereNotNull('u.deleted_at');
+        $perPage = 20;
+        $deletedUsers = $deletedUsersQuery->paginate($perPage)->withQueryString();
         $systemSettings = $this->getSystemSettings();
+
+        if ($request->ajax() || $request->expectsJson() || $request->query('ajax') === '1') {
+            return response()->json([
+                'rows_html' => view('superadmin.partials.recycle-bin-table-rows', ['users' => $deletedUsers])->render(),
+                'pagination_html' => view('admin.partials.user-pagination', ['users' => $deletedUsers])->render(),
+                'total' => $deletedUsers->total(),
+                'current_page' => $deletedUsers->currentPage(),
+                'last_page' => $deletedUsers->lastPage(),
+            ]);
+        }
 
         echo view('all.header', [
             'pageTitle' => 'Recycle Bin',
             'pageClass' => 'page-family-tree',
         ]);
-        echo view('superadmin.recycle-bin', compact('systemSettings'));
+        echo view('superadmin.recycle-bin', compact('systemSettings', 'deletedUsers'));
         echo view('all.footer');
     }
 
@@ -2076,6 +2106,72 @@ class Ctrl extends Controller
             return redirect('/management/users')->with('error', 'User not found.');
         }
 
+        if ($user->deleted_at !== null) {
+            return redirect('/management/recycle-bin')->with('error', 'User is already in the recycle bin.');
+        }
+
+        DB::table('user')
+            ->where('userid', $targetUserId)
+            ->update(['deleted_at' => Carbon::now()]);
+
+        $this->logActivity($request, 'management.delete_user', [
+            'target_userid' => $targetUserId,
+            'target_username' => (string) ($user->username ?? ''),
+        ]);
+
+        return redirect('/management/users')->with('success', 'User has been moved to Recycle Bin.');
+    }
+
+    public function restoreUser(Request $request, $userid)
+    {
+        if (!$request->session()->has('authenticated_user')) {
+            return redirect('/login');
+        }
+
+        if ((int) session('authenticated_user.roleid') !== 1) {
+            return redirect('/management/users')->with('error', 'Only superadmin can restore users.');
+        }
+
+        $targetUserId = (int) $userid;
+        $user = DB::table('user')
+            ->where('userid', $targetUserId)
+            ->first();
+
+        if (!$user || $user->deleted_at === null) {
+            return redirect('/management/recycle-bin')->with('error', 'User not found in recycle bin.');
+        }
+
+        DB::table('user')
+            ->where('userid', $targetUserId)
+            ->update(['deleted_at' => null]);
+
+        $this->logActivity($request, 'management.restore_user', [
+            'target_userid' => $targetUserId,
+            'target_username' => (string) ($user->username ?? ''),
+        ]);
+
+        return redirect('/management/recycle-bin')->with('success', 'User has been restored from Recycle Bin.');
+    }
+
+    public function forceDeleteUser(Request $request, $userid)
+    {
+        if (!$request->session()->has('authenticated_user')) {
+            return redirect('/login');
+        }
+
+        if ((int) session('authenticated_user.roleid') !== 1) {
+            return redirect('/management/users')->with('error', 'Only superadmin can permanently delete users.');
+        }
+
+        $targetUserId = (int) $userid;
+        $user = DB::table('user')
+            ->where('userid', $targetUserId)
+            ->first();
+
+        if (!$user || $user->deleted_at === null) {
+            return redirect('/management/recycle-bin')->with('error', 'User not found in recycle bin.');
+        }
+
         DB::transaction(function () use ($targetUserId) {
             $familyMemberIds = DB::table('family_member')
                 ->where('userid', $targetUserId)
@@ -2095,12 +2191,12 @@ class Ctrl extends Controller
             DB::table('user')->where('userid', $targetUserId)->delete();
         });
 
-        $this->logActivity($request, 'management.delete_user', [
+        $this->logActivity($request, 'management.force_delete_user', [
             'target_userid' => $targetUserId,
             'target_username' => (string) ($user->username ?? ''),
         ]);
 
-        return redirect('/management/users')->with('success', 'User has been deleted.');
+        return redirect('/management/recycle-bin')->with('success', 'User has been permanently deleted.');
     }
 
     public function updateFamilyProfile(Request $request)
@@ -2976,6 +3072,7 @@ class Ctrl extends Controller
             ->select(
                 'u.userid',
                 'u.username',
+                'u.deleted_at',
                 'l.levelname',
                 'r.rolename',
                 DB::raw("COALESCE(e.name, fm.name, '-') as fullname"),

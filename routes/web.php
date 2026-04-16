@@ -31,6 +31,8 @@ Route::get('/management/recycle-bin', 'App\Http\Controllers\Ctrl@recycleBin');
 Route::post('/management/users/store', 'App\Http\Controllers\Ctrl@storeUser');
 Route::post('/management/users/{userid}/reset-password', 'App\Http\Controllers\Ctrl@resetUserPassword');
 Route::post('/management/users/{userid}/delete', 'App\Http\Controllers\Ctrl@deleteUser');
+Route::post('/management/users/{userid}/restore', 'App\Http\Controllers\Ctrl@restoreUser');
+Route::post('/management/users/{userid}/force-delete', 'App\Http\Controllers\Ctrl@forceDeleteUser');
 Route::post('/family/profile', 'App\Http\Controllers\Ctrl@updateFamilyProfile');
 Route::post('/family/member/store', 'App\Http\Controllers\Ctrl@storeFamilyMemberFromHome');
 Route::post('/family/member/delete', 'App\Http\Controllers\Ctrl@deleteFamilyMemberFromHome');

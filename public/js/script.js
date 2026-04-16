@@ -1330,7 +1330,32 @@
 
         // Horizontal movement must use drag, not wheel/trackpad horizontal scroll.
         treeContainer.addEventListener("wheel", function (event) {
-            if (Math.abs(event.deltaX) > 0 || event.shiftKey) {
+            if (!treeCanvas || !treeZoomStage) {
+                return;
+            }
+
+            var isHorizontalScroll = Math.abs(event.deltaX) > 0 || event.shiftKey;
+            var isVerticalScroll = Math.abs(event.deltaY) > 0;
+
+            if (isVerticalScroll) {
+                var zoomDelta = event.deltaY > 0 ? -treeZoomStep : treeZoomStep;
+                var nextZoom = Math.max(minTreeZoom, Math.min(maxTreeZoom, currentTreeZoom + zoomDelta));
+
+                if (nextZoom !== currentTreeZoom) {
+                    var rect = treeZoomStage.getBoundingClientRect();
+                    var pointerX = event.clientX - rect.left + treeContainer.scrollLeft;
+                    var pointerY = event.clientY - rect.top + treeContainer.scrollTop;
+                    var oldZoom = currentTreeZoom;
+
+                    setTreeZoom(nextZoom);
+
+                    var zoomRatio = currentTreeZoom / oldZoom;
+                    treeContainer.scrollLeft = Math.round(pointerX * zoomRatio - (event.clientX - rect.left));
+                    treeContainer.scrollTop = Math.round(pointerY * zoomRatio - (event.clientY - rect.top));
+                }
+            }
+
+            if (isHorizontalScroll || isVerticalScroll) {
                 event.preventDefault();
             }
         }, { passive: false });

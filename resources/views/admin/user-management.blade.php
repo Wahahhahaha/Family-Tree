@@ -11,6 +11,7 @@
             </div>
             <div class="management-tools">
                 <span id="userTableCount" class="table-count">Total: <?php echo e($users->total()); ?> users</span>
+
                 <a href="/management/users/export" class="btn btn-export">Export .xlsx</a>
                 <button id="openImportUserModal" type="button" class="btn btn-ghost">Import</button>
                 <button id="openAddUserModal" type="button" class="btn btn-primary">Add User</button>

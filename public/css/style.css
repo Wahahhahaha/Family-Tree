@@ -815,6 +815,25 @@
     border-left: 2px solid var(--line);
 }
 
+/* Single parent child - line comes from one parent only */
+.page-family-tree .tree li.single-parent-child::before {
+    display: none;
+}
+
+.page-family-tree .tree li.single-parent-child::after {
+    left: 0;
+    right: auto;
+    width: 100%;
+    border-left: 0;
+    border-top: 2px solid var(--line);
+    border-right: 2px solid var(--line);
+    border-radius: 0 10px 0 0;
+}
+
+.page-family-tree .tree li.single-parent-child ul::before {
+    left: 100%;
+}
+
 .page-family-tree .member-card {
     width: 200px;
     min-height: 210px;
