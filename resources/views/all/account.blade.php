@@ -118,7 +118,7 @@
 
                 <div class="settings-field">
                     <label for="accountFamilyEmail">Email</label>
-                    <input id="accountFamilyEmail" type="email" name="email" value="<?php echo e(old('email', $currentFamilyProfile->email ?? '')); ?>" placeholder="Enter your email">
+                    <input id="accountFamilyEmail" type="email" name="email" value="<?php echo e(old('email', $currentFamilyProfile->email ?? '')); ?>" placeholder="Enter your email" data-current-email="<?php echo e(strtolower(trim($currentFamilyProfile->email ?? ''))); ?>">
                 </div>
 
                 <div class="settings-field">
@@ -167,6 +167,17 @@
             </form>
         </section>
 
+        <div id="emailChangeModal" class="modal hidden" role="dialog" aria-modal="true">
+            <div class="modal-backdrop"></div>
+            <div class="modal-card">
+                <h4>Email Change Requested</h4>
+                <p id="emailChangeMessage"></p>
+                <div class="modal-actions">
+                    <button id="emailChangeCloseBtn" type="button" class="btn btn-ghost">Close</button>
+                </div>
+            </div>
+        </div>
+
         <div id="photoCropModal" class="photo-crop-modal hidden" role="dialog" aria-modal="true" aria-labelledby="photoCropTitle">
             <div class="photo-crop-backdrop"></div>
             <div class="photo-crop-card">
@@ -187,3 +198,93 @@
         </div>
     <?php endif; ?>
 </div>
+
+<script>
+(function() {
+    var profileForm = document.getElementById('profileForm');
+    var emailChangeModal = document.getElementById('emailChangeModal');
+    var emailChangeMessage = document.getElementById('emailChangeMessage');
+    var emailChangeCloseBtn = document.getElementById('emailChangeCloseBtn');
+    var csrfMeta = document.querySelector('meta[name="csrf-token"]');
+    var csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : '';
+
+    if (profileForm) {
+        profileForm.addEventListener('submit', function(e) {
+            var emailInput = document.getElementById('accountFamilyEmail');
+            var currentEmail = (emailInput.getAttribute('data-current-email') || '').toLowerCase().trim();
+            var newEmail = emailInput.value.toLowerCase().trim();
+
+            if (newEmail !== currentEmail && newEmail !== '') {
+                e.preventDefault();
+                // Email changed, send to change-email endpoint
+                var formData = new FormData();
+                formData.append('_token', csrfToken);
+                formData.append('new_email', newEmail);
+
+                fetch('/family/change-email', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json'
+                    }
+                })
+                .then(function(response) {
+                    return response.text().then(function(text) {
+                        var data;
+                        try {
+                            data = JSON.parse(text);
+                        } catch (parseError) {
+                            throw new Error(text || 'Invalid server response');
+                        }
+
+                        if (!response.ok) {
+                            var errorMessage = data.message || 'Failed to send confirmation email.';
+                            throw new Error(errorMessage);
+                        }
+
+                        return data;
+                    });
+                })
+                .then(function(data) {
+                    if (data.message && data.old_email && data.new_email) {
+                        emailChangeMessage.innerHTML = 'You requested a change of email address, from ' + data.old_email + ' to ' + data.new_email + '. For security reasons, we are sending you a message to your new address to confirm that it belongs to you. Your email address will be updated as soon as you open the URL sent to you in the message. The confirmation link will expire in 10 minutes.';
+                        emailChangeModal.classList.remove('hidden');
+                        emailChangeModal.style.display = 'flex';
+                        // Reset email field to current
+                        emailInput.value = currentEmail;
+                    } else {
+                        emailChangeMessage.innerHTML = data.message || 'An unexpected response was returned.';
+                        emailChangeModal.classList.remove('hidden');
+                        emailChangeModal.style.display = 'flex';
+                    }
+                })
+                .catch(function(error) {
+                    console.error('Error:', error);
+                    emailChangeMessage.innerHTML = error.message || 'An error occurred while sending confirmation. Please try again later.';
+                    emailChangeModal.classList.remove('hidden');
+                    emailChangeModal.style.display = 'flex';
+                });
+            }
+            // If email not changed, let the form submit normally
+        });
+    }
+
+    if (emailChangeCloseBtn) {
+        emailChangeCloseBtn.addEventListener('click', function() {
+            emailChangeModal.classList.add('hidden');
+            emailChangeModal.style.display = 'none';
+        });
+    }
+
+    // Close modal when clicking backdrop
+    if (emailChangeModal) {
+        emailChangeModal.addEventListener('click', function(e) {
+            if (e.target === emailChangeModal) {
+                emailChangeModal.classList.add('hidden');
+                emailChangeModal.style.display = 'none';
+            }
+        });
+    }
+})();
+</script>

@@ -34,6 +34,8 @@ Route::post('/management/users/{userid}/delete', 'App\Http\Controllers\Ctrl@dele
 Route::post('/management/users/{userid}/restore', 'App\Http\Controllers\Ctrl@restoreUser');
 Route::post('/management/users/{userid}/force-delete', 'App\Http\Controllers\Ctrl@forceDeleteUser');
 Route::post('/family/profile', 'App\Http\Controllers\Ctrl@updateFamilyProfile');
+Route::post('/family/change-email', 'App\Http\Controllers\Ctrl@requestChangeEmail');
+Route::get('/family/verify-email/{token}', 'App\Http\Controllers\Ctrl@verifyEmailChange');
 Route::post('/family/member/store', 'App\Http\Controllers\Ctrl@storeFamilyMemberFromHome');
 Route::post('/family/member/delete', 'App\Http\Controllers\Ctrl@deleteFamilyMemberFromHome');
 Route::post('/family/member/life-status', 'App\Http\Controllers\Ctrl@updateFamilyMemberLifeStatus');

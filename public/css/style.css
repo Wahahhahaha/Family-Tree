@@ -2631,3 +2631,69 @@
         font-size: 24px;
     }
 }
+
+/* Email Change Modal */
+.modal {
+    position: fixed;
+    inset: 0;
+    z-index: 1500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.modal.hidden {
+    display: none;
+}
+
+.modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.42);
+}
+
+.modal-card {
+    position: relative;
+    width: min(500px, 100%);
+    border-radius: 18px;
+    background: #fff;
+    border: 1px solid #d8e8f2;
+    box-shadow: 0 20px 55px rgba(15, 50, 74, 0.3);
+    padding: 24px;
+}
+
+.modal-card h4 {
+    margin: 0 0 12px;
+    font-size: 18px;
+    font-family: "Sora", sans-serif;
+}
+
+.modal-card p {
+    margin: 0 0 20px;
+    line-height: 1.5;
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+}
+
+.modal-actions .btn {
+    padding: 8px 16px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.modal-actions .btn-ghost {
+    background: transparent;
+    color: #666;
+}
+
+.modal-actions .btn-ghost:hover {
+    background: #f5f5f5;
+}

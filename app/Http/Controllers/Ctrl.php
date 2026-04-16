@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
+use App\Mail\ChangeEmailVerification;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -2383,6 +2384,124 @@ class Ctrl extends Controller
         }
 
         return redirect($redirectTo)->with('success', 'Profile details updated successfully.');
+    }
+
+    public function requestChangeEmail(Request $request)
+    {
+        if (!$request->session()->has('authenticated_user')) {
+            return response()->json(['message' => 'Unauthenticated.'], 401);
+        }
+
+        $currentUserId = (int) session('authenticated_user.userid');
+        $currentLevelId = (int) session('authenticated_user.levelid');
+
+        if ($currentLevelId !== 2) {
+            return response()->json(['message' => 'Only family members can change email.'], 403);
+        }
+
+        $validated = $request->validate([
+            'new_email' => ['required', 'email', 'max:255'],
+        ]);
+
+        $newEmail = strtolower(trim((string) $validated['new_email']));
+
+        $familyMember = DB::table('family_member')
+            ->where('userid', $currentUserId)
+            ->first();
+
+        if (!$familyMember) {
+            return response()->json(['message' => 'Family profile not found.'], 404);
+        }
+
+        $currentEmail = strtolower(trim((string) $familyMember->email));
+
+        if ($currentEmail === $newEmail) {
+            return response()->json(['message' => 'New email is the same as current email.'], 400);
+        }
+
+        // Check if new email is already used by another user
+        $existingUser = DB::table('family_member')
+            ->where('email', $newEmail)
+            ->where('userid', '!=', $currentUserId)
+            ->exists();
+
+        if ($existingUser) {
+            return response()->json(['message' => 'This email is already in use.'], 400);
+        }
+
+        // Generate token and verification URL
+        $token = Str::random(64);
+        $expiresAt = now()->addMinutes(10);
+        $verificationUrl = url('/family/verify-email/' . $token);
+
+        // Send email first, then save pending email only when mail succeeds
+        try {
+            Mail::to($newEmail)->send(new ChangeEmailVerification(
+                $familyMember->name,
+                $currentEmail,
+                $newEmail,
+                $verificationUrl
+            ));
+        } catch (\Exception $e) {
+            \Log::error('Failed to send email change verification: ' . $e->getMessage());
+
+            return response()->json([
+                'message' => 'Failed to send verification email. Please check your mail configuration and try again.',
+            ], 500);
+        }
+
+        DB::table('family_member')
+            ->where('userid', $currentUserId)
+            ->update([
+                'pending_email' => $newEmail,
+                'email_verification_token' => $token,
+                'email_verification_token_expires_at' => $expiresAt,
+            ]);
+
+        $this->logActivity($request, 'family.request_email_change', [
+            'userid' => $currentUserId,
+            'old_email' => $currentEmail,
+            'new_email' => $newEmail,
+        ]);
+
+        return response()->json([
+            'message' => 'We have sent an email to your new address for confirmation.',
+            'old_email' => $currentEmail,
+            'new_email' => $newEmail,
+        ]);
+    }
+
+    public function verifyEmailChange(Request $request, $token)
+    {
+        $familyMember = DB::table('family_member')
+            ->where('email_verification_token', $token)
+            ->where('email_verification_token_expires_at', '>', now())
+            ->first();
+
+        if (!$familyMember) {
+            return redirect('/account')->with('error', 'Invalid or expired verification link.');
+        }
+
+        $oldEmail = $familyMember->email;
+        $newEmail = $familyMember->pending_email;
+
+        // Update email
+        DB::table('family_member')
+            ->where('memberid', $familyMember->memberid)
+            ->update([
+                'email' => $newEmail,
+                'pending_email' => null,
+                'email_verification_token' => null,
+                'email_verification_token_expires_at' => null,
+            ]);
+
+        $this->logActivity($request, 'family.verify_email_change', [
+            'userid' => $familyMember->userid,
+            'old_email' => $oldEmail,
+            'new_email' => $newEmail,
+        ]);
+
+        return redirect('/account')->with('success', 'Your email address has been successfully updated.');
     }
 
     public function storeFamilyMemberFromHome(Request $request)
