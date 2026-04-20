@@ -18,12 +18,25 @@
     $memberCanDeleteChild = !empty($canDeleteChildMap[(int) ($nodeMember->memberid ?? 0)]);
     $memberCanUpdateLifeStatus = !empty($canUpdateLifeStatusMap[(int) ($nodeMember->memberid ?? 0)]);
     $nodeMemberId = (int) ($nodeMember->memberid ?? 0);
+    $hasPartner = !empty($nodePartners);
     $parentingMode = (string) ($parentingMode ?? 'with_current_partner');
     $isSingleParentChild = $parentingMode === 'single_parent';
+    $childrenWithPartner = [];
+    $childrenSingleParent = [];
+    foreach ($nodeChildren as $childNode) {
+        $childMemberId = (int) ($childNode['member']->memberid ?? 0);
+        $childMode = (string) ($childParentingModeMap[$nodeMemberId][$childMemberId] ?? 'with_current_partner');
+        if ($childMode === 'single_parent') {
+            $childrenSingleParent[] = ['node' => $childNode, 'mode' => $childMode];
+            continue;
+        }
+
+        $childrenWithPartner[] = ['node' => $childNode, 'mode' => $childMode];
+    }
 ?>
 
-<li class="<?php echo e($isSingleParentChild ? 'single-parent-child' : ''); ?>">
-    <div class="partner-row">
+<li class="<?php echo e(trim(($isSingleParentChild ? 'single-parent-child ' : '') . ($hasPartner ? 'has-partner-node' : ''))); ?>">
+    <div class="partner-row <?php echo e($hasPartner ? 'has-partner' : ''); ?>">
         <article
             class="member-card <?php echo e($isActive ? 'active' : ''); ?> <?php echo e($memberLifeStatusRaw === 'deceased' ? 'is-deceased' : ''); ?>"
             data-memberid="<?php echo e($nodeMember->memberid); ?>"
@@ -33,6 +46,7 @@
             data-birthdate="<?php echo e($nodeMember->birthdate ?? '-'); ?>"
             data-birthplace="<?php echo e($nodeMember->birthplace ?? '-'); ?>"
             data-status="<?php echo e(ucfirst((string) ($nodeMember->life_status ?? '-'))); ?>"
+            data-marital-status="<?php echo e(ucfirst((string) ($nodeMember->marital_status ?? '-'))); ?>"
             data-life-status-raw="<?php echo e($memberLifeStatusRaw); ?>"
             data-email="<?php echo e($nodeMember->email ?: '-'); ?>"
             data-phone="<?php echo e($nodeMember->phonenumber ?: '-'); ?>"
@@ -70,6 +84,7 @@
                 data-birthdate="<?php echo e($partner->birthdate ?? '-'); ?>"
                 data-birthplace="<?php echo e($partner->birthplace ?? '-'); ?>"
                 data-status="<?php echo e(ucfirst((string) ($partner->life_status ?? '-'))); ?>"
+                data-marital-status="<?php echo e(ucfirst((string) ($partner->marital_status ?? '-'))); ?>"
                 data-life-status-raw="<?php echo e($partnerLifeStatusRaw); ?>"
                 data-email="<?php echo e($partner->email ?: '-'); ?>"
                 data-phone="<?php echo e($partner->phonenumber ?: '-'); ?>"
@@ -94,47 +109,81 @@
     </div>
 
     <?php if (!empty($nodeChildren) && $depth < $maxVisibleDepth): ?>
-        <ul>
-            <?php foreach ($nodeChildren as $childNode): ?>
-                <?php 
-                    $childMemberId = (int) ($childNode['member']->memberid ?? 0);
-                    $childParentingMode = $childParentingModeMap[$nodeMemberId][$childMemberId] ?? 'with_current_partner';
-                ?>
-                <?php echo view('all.partials.family-tree-node', [
-                    'node' => $childNode,
-                    'initialMemberId' => $initialMemberId,
-                    'relationMap' => $relationMap,
-                    'canDeletePartnerMap' => $canDeletePartnerMap,
-                    'canDeleteChildMap' => $canDeleteChildMap,
-                    'canUpdateLifeStatusMap' => $canUpdateLifeStatusMap,
-                    'childParentingModeMap' => $childParentingModeMap,
-                    'parentingMode' => $childParentingMode,
-                    'maxVisibleDepth' => $maxVisibleDepth,
-                    'depth' => $depth + 1,
-                ]); ?>
-            <?php endforeach; ?>
-        </ul>
+        <?php if (!empty($childrenWithPartner)): ?>
+            <ul class="child-group child-group-couple">
+                <?php foreach ($childrenWithPartner as $childData): ?>
+                    <?php echo view('all.partials.family-tree-node', [
+                        'node' => $childData['node'],
+                        'initialMemberId' => $initialMemberId,
+                        'relationMap' => $relationMap,
+                        'canDeletePartnerMap' => $canDeletePartnerMap,
+                        'canDeleteChildMap' => $canDeleteChildMap,
+                        'canUpdateLifeStatusMap' => $canUpdateLifeStatusMap,
+                        'childParentingModeMap' => $childParentingModeMap,
+                        'parentingMode' => $childData['mode'],
+                        'maxVisibleDepth' => $maxVisibleDepth,
+                        'depth' => $depth + 1,
+                    ]); ?>
+                <?php endforeach; ?>
+            </ul>
+        <?php endif; ?>
+        <?php if (!empty($childrenSingleParent)): ?>
+            <ul class="child-group child-group-single-parent">
+                <?php foreach ($childrenSingleParent as $childData): ?>
+                    <?php echo view('all.partials.family-tree-node', [
+                        'node' => $childData['node'],
+                        'initialMemberId' => $initialMemberId,
+                        'relationMap' => $relationMap,
+                        'canDeletePartnerMap' => $canDeletePartnerMap,
+                        'canDeleteChildMap' => $canDeleteChildMap,
+                        'canUpdateLifeStatusMap' => $canUpdateLifeStatusMap,
+                        'childParentingModeMap' => $childParentingModeMap,
+                        'parentingMode' => $childData['mode'],
+                        'maxVisibleDepth' => $maxVisibleDepth,
+                        'depth' => $depth + 1,
+                    ]); ?>
+                <?php endforeach; ?>
+            </ul>
+        <?php endif; ?>
     <?php elseif (!empty($nodeChildren)): ?>
         <button type="button" class="btn btn-ghost tree-see-more-btn" data-open="0">See more</button>
-        <ul class="tree-extra-children hidden">
-            <?php foreach ($nodeChildren as $childNode): ?>
-                <?php 
-                    $childMemberId = (int) ($childNode['member']->memberid ?? 0);
-                    $childParentingMode = $childParentingModeMap[$nodeMemberId][$childMemberId] ?? 'with_current_partner';
-                ?>
-                <?php echo view('all.partials.family-tree-node', [
-                    'node' => $childNode,
-                    'initialMemberId' => $initialMemberId,
-                    'relationMap' => $relationMap,
-                    'canDeletePartnerMap' => $canDeletePartnerMap,
-                    'canDeleteChildMap' => $canDeleteChildMap,
-                    'canUpdateLifeStatusMap' => $canUpdateLifeStatusMap,
-                    'childParentingModeMap' => $childParentingModeMap,
-                    'parentingMode' => $childParentingMode,
-                    'maxVisibleDepth' => $maxVisibleDepth,
-                    'depth' => $depth + 1,
-                ]); ?>
-            <?php endforeach; ?>
-        </ul>
+        <div class="tree-extra-children hidden">
+            <?php if (!empty($childrenWithPartner)): ?>
+                <ul class="child-group child-group-couple">
+                    <?php foreach ($childrenWithPartner as $childData): ?>
+                        <?php echo view('all.partials.family-tree-node', [
+                            'node' => $childData['node'],
+                            'initialMemberId' => $initialMemberId,
+                            'relationMap' => $relationMap,
+                            'canDeletePartnerMap' => $canDeletePartnerMap,
+                            'canDeleteChildMap' => $canDeleteChildMap,
+                            'canUpdateLifeStatusMap' => $canUpdateLifeStatusMap,
+                            'childParentingModeMap' => $childParentingModeMap,
+                            'parentingMode' => $childData['mode'],
+                            'maxVisibleDepth' => $maxVisibleDepth,
+                            'depth' => $depth + 1,
+                        ]); ?>
+                    <?php endforeach; ?>
+                </ul>
+            <?php endif; ?>
+            <?php if (!empty($childrenSingleParent)): ?>
+                <ul class="child-group child-group-single-parent">
+                    <?php foreach ($childrenSingleParent as $childData): ?>
+                        <?php echo view('all.partials.family-tree-node', [
+                            'node' => $childData['node'],
+                            'initialMemberId' => $initialMemberId,
+                            'relationMap' => $relationMap,
+                            'canDeletePartnerMap' => $canDeletePartnerMap,
+                            'canDeleteChildMap' => $canDeleteChildMap,
+                            'canUpdateLifeStatusMap' => $canUpdateLifeStatusMap,
+                            'childParentingModeMap' => $childParentingModeMap,
+                            'parentingMode' => $childData['mode'],
+                            'maxVisibleDepth' => $maxVisibleDepth,
+                            'depth' => $depth + 1,
+                        ]); ?>
+                    <?php endforeach; ?>
+                </ul>
+            <?php endif; ?>
+        </div>
     <?php endif; ?>
 </li>

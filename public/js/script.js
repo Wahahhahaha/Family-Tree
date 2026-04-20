@@ -60,6 +60,7 @@
     var detailBirthdate = document.getElementById("detailBirthdate");
     var detailBirthplace = document.getElementById("detailBirthplace");
     var detailStatus = document.getElementById("detailStatus");
+    var detailMaritalStatus = document.getElementById("detailMaritalStatus");
     var detailPhone = document.getElementById("detailPhone");
     var detailEmail = document.getElementById("detailEmail");
     var detailJob = document.getElementById("detailJob");
@@ -1578,6 +1579,9 @@
             detailBirthplace.textContent = card.dataset.birthplace || "-";
         }
         detailStatus.textContent = card.dataset.status || "-";
+        if (detailMaritalStatus) {
+            detailMaritalStatus.textContent = card.dataset.maritalStatus || "-";
+        }
         if (detailPhone) {
             detailPhone.textContent = card.dataset.phone || "-";
         }

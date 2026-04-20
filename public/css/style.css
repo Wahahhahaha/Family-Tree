@@ -347,6 +347,7 @@
     --text: #102133;
     --muted: #678196;
     --line: #d8e5ef;
+    --tree-link: #5d6d79;
     --primary: #1f9ad6;
     --primary-soft: #ddf1fa;
     --accent: #17b67f;
@@ -577,7 +578,7 @@
 .page-family-tree .stats {
     margin-top: 18px;
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 12px;
 }
 
@@ -773,13 +774,13 @@
     right: 50%;
     width: 50%;
     height: 26px;
-    border-top: 2px solid var(--line);
+    border-top: 1.5px solid var(--tree-link);
 }
 
 .page-family-tree .tree li::after {
     right: auto;
     left: 50%;
-    border-left: 2px solid var(--line);
+    border-left: 1.5px solid var(--tree-link);
 }
 
 .page-family-tree .tree li:only-child::after,
@@ -797,12 +798,12 @@
 }
 
 .page-family-tree .tree li:last-child::before {
-    border-right: 2px solid var(--line);
-    border-radius: 0 10px 0 0;
+    border-right: 1.5px solid var(--tree-link);
+    border-radius: 0;
 }
 
 .page-family-tree .tree li:first-child::after {
-    border-radius: 10px 0 0 0;
+    border-radius: 0;
 }
 
 .page-family-tree .tree ul ul::before {
@@ -812,26 +813,15 @@
     left: 50%;
     width: 0;
     height: 26px;
-    border-left: 2px solid var(--line);
+    border-left: 1.5px solid var(--tree-link);
 }
 
-/* Single parent child - line comes from one parent only */
-.page-family-tree .tree li.single-parent-child::before {
-    display: none;
+.page-family-tree .tree li > ul.child-group + ul.child-group {
+    margin-top: 16px;
 }
 
-.page-family-tree .tree li.single-parent-child::after {
-    left: 0;
-    right: auto;
-    width: 100%;
-    border-left: 0;
-    border-top: 2px solid var(--line);
-    border-right: 2px solid var(--line);
-    border-radius: 0 10px 0 0;
-}
-
-.page-family-tree .tree li.single-parent-child ul::before {
-    left: 100%;
+.page-family-tree .tree li.has-partner-node > ul.child-group-single-parent::before {
+    left: 25%;
 }
 
 .page-family-tree .member-card {
@@ -853,9 +843,21 @@
 .page-family-tree .partner-row {
     display: inline-flex;
     align-items: flex-start;
-    gap: 12px;
-    flex-wrap: wrap;
+    gap: 18px;
+    flex-wrap: nowrap;
     justify-content: center;
+    position: relative;
+}
+
+.page-family-tree .partner-row.has-partner::before {
+    content: "";
+    position: absolute;
+    top: 58px;
+    left: 100px;
+    right: 100px;
+    height: 0;
+    border-top: 1.5px solid var(--tree-link);
+    pointer-events: none;
 }
 
 .page-family-tree .member-card:hover {

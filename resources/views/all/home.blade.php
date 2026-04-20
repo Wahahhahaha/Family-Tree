@@ -78,10 +78,6 @@
             <small>Deceased</small>
             <h2><?php echo e($deceasedMembers); ?></h2>
         </article>
-        <article class="stat-card">
-            <small>Last Updated</small>
-            <h2 class="last-update"><?php echo e(now()->format('d M Y')); ?></h2>
-        </article>
     </section>
 
     <?php if (!empty($flashMessages)): ?>
@@ -142,6 +138,7 @@
                     'canDeletePartnerMap' => $canDeletePartnerMap,
                     'canDeleteChildMap' => $canDeleteChildMap,
                     'canUpdateLifeStatusMap' => $canUpdateLifeStatusMap,
+                    'childParentingModeMap' => $childParentingModeMap,
                 ]); ?>
             </div>
 
@@ -201,7 +198,8 @@
                         <li><span>Age</span><strong id="detailAge"><?php echo e($firstMember->age ?? '-'); ?></strong></li>
                         <li><span>Date of Birth</span><strong id="detailBirthdate"><?php echo e($firstMember->birthdate ?? '-'); ?></strong></li>
                         <li><span>Birthplace</span><strong id="detailBirthplace"><?php echo e($firstMember->birthplace ?? '-'); ?></strong></li>
-                        <li><span>Status</span><strong id="detailStatus"><?php echo e(isset($firstMember->life_status) ? ucfirst((string) $firstMember->life_status) : '-'); ?></strong></li>
+                        <li><span>Life Status</span><strong id="detailStatus"><?php echo e(isset($firstMember->life_status) ? ucfirst((string) $firstMember->life_status) : '-'); ?></strong></li>
+                        <li><span>Marital Status</span><strong id="detailMaritalStatus"><?php echo e(isset($firstMember->marital_status) ? ucfirst((string) $firstMember->marital_status) : '-'); ?></strong></li>
                         <li><span>Phone</span><strong id="detailPhone"><?php echo e($firstMember->phonenumber ?? '-'); ?></strong></li>
                         <li><span>Email</span><strong id="detailEmail"><?php echo e($firstMember->email ?? '-'); ?></strong></li>
                         <li><span>Job</span><strong id="detailJob"><?php echo e($firstMember->job ?? '-'); ?></strong></li>

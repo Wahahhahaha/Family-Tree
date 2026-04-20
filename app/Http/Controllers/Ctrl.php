@@ -43,6 +43,7 @@ class Ctrl extends Controller
                 'fm.birthdate',
                 'fm.birthplace',
                 'fm.life_status',
+                'fm.marital_status',
                 'fm.picture',
                 'fm.email',
                 'fm.phonenumber',
@@ -87,7 +88,10 @@ class Ctrl extends Controller
             $from = (int) $relation->memberid;
             $to = (int) $relation->relatedmemberid;
             $type = strtolower((string) $relation->relationtype);
-            $parentingMode = (string) ($relation->child_parenting_mode ?? 'with_current_partner');
+            $rawParentingMode = strtolower(trim((string) ($relation->child_parenting_mode ?? '')));
+            $parentingMode = in_array($rawParentingMode, ['with_current_partner', 'single_parent'], true)
+                ? $rawParentingMode
+                : '';
 
             if (!isset($membersById[$from]) || !isset($membersById[$to])) {
                 continue;
@@ -116,6 +120,24 @@ class Ctrl extends Controller
                 if (!in_array($from, $partnerMap[$to], true)) {
                     $partnerMap[$to][] = $from;
                 }
+            }
+        }
+
+        foreach ($childParentingModeMap as $parentId => $childModes) {
+            foreach ($childModes as $childId => $mode) {
+                if (in_array($mode, ['with_current_partner', 'single_parent'], true)) {
+                    continue;
+                }
+
+                $parentId = (int) $parentId;
+                $childId = (int) $childId;
+                $childParents = array_values(array_filter($parentMap[$childId] ?? [], function ($parentMemberId) use ($parentId) {
+                    return (int) $parentMemberId !== $parentId;
+                }));
+                $parentPartners = $partnerMap[$parentId] ?? [];
+                $hasCurrentPartnerAsCoParent = !empty(array_intersect($childParents, $parentPartners));
+                $resolvedMode = $hasCurrentPartnerAsCoParent ? 'with_current_partner' : 'single_parent';
+                $childParentingModeMap[$parentId][$childId] = $resolvedMode;
             }
         }
 
@@ -347,6 +369,18 @@ class Ctrl extends Controller
                 continue;
             }
 
+            $isStepChild = false;
+            foreach ($partnerMap[$currentMemberId] ?? [] as $myPartnerId) {
+                if (in_array($targetId, $childrenOf((int) $myPartnerId), true) && !in_array($targetId, $myChildren, true)) {
+                    $isStepChild = true;
+                    break;
+                }
+            }
+            if ($isStepChild) {
+                $relationLabels[$targetId] = $genderLabel($targetId, 'Step Son', 'Step Daughter', 'Step Child');
+                continue;
+            }
+
             $stepParentSet = [];
             foreach ($myParents as $parentId) {
                 foreach ($partnerMap[(int) $parentId] ?? [] as $partnerId) {
@@ -422,6 +456,33 @@ class Ctrl extends Controller
                 continue;
             }
 
+            $inLawGrandParents = [];
+            foreach (array_keys($inLawParents) as $inLawParentId) {
+                foreach ($parentsOf((int) $inLawParentId) as $grandInLawParentId) {
+                    $inLawGrandParents[(int) $grandInLawParentId] = true;
+                }
+            }
+            if (isset($inLawGrandParents[$targetId])) {
+                $relationLabels[$targetId] = $genderLabel($targetId, 'Grandfather in law', 'Grandmother in law', 'Grandparent in law');
+                continue;
+            }
+
+            $inLawGrandParentSiblings = [];
+            foreach (array_keys($inLawGrandParents) as $inLawGrandParentId) {
+                foreach ($parentsOf((int) $inLawGrandParentId) as $inLawGreatGrandParentId) {
+                    foreach ($childrenOf((int) $inLawGreatGrandParentId) as $inLawGrandParentSiblingId) {
+                        $inLawGrandParentSiblingId = (int) $inLawGrandParentSiblingId;
+                        if ($inLawGrandParentSiblingId !== (int) $inLawGrandParentId) {
+                            $inLawGrandParentSiblings[$inLawGrandParentSiblingId] = true;
+                        }
+                    }
+                }
+            }
+            if (isset($inLawGrandParentSiblings[$targetId])) {
+                $relationLabels[$targetId] = $genderLabel($targetId, 'Great-uncle-in-law', 'Great-aunt-in-law', 'Great-relative-in-law');
+                continue;
+            }
+
             $inLawParentSiblings = [];
             foreach (array_keys($inLawParents) as $inLawParentId) {
                 foreach ($parentsOf((int) $inLawParentId) as $grandInLawParentId) {
@@ -438,6 +499,30 @@ class Ctrl extends Controller
                 continue;
             }
 
+            $inLawGreatUnclesAunts = [];
+            foreach (array_keys($inLawGrandParents) as $inLawGrandParentId) {
+                foreach ($parentsOf((int) $inLawGrandParentId) as $inLawGreatGrandParentId) {
+                    foreach ($childrenOf((int) $inLawGreatGrandParentId) as $inLawGrandParentSiblingId) {
+                        $inLawGrandParentSiblingId = (int) $inLawGrandParentSiblingId;
+                        if ($inLawGrandParentSiblingId !== (int) $inLawGrandParentId) {
+                            $inLawGreatUnclesAunts[$inLawGrandParentSiblingId] = true;
+                        }
+                    }
+                }
+            }
+
+            $isSecondCousinInLaw = false;
+            foreach (array_keys($inLawGreatUnclesAunts) as $inLawGreatUncleAuntId) {
+                if (in_array($targetId, $childrenOf((int) $inLawGreatUncleAuntId), true)) {
+                    $isSecondCousinInLaw = true;
+                    break;
+                }
+            }
+            if ($isSecondCousinInLaw) {
+                $relationLabels[$targetId] = 'Second cousin-in-law';
+                continue;
+            }
+
             $myGrandParents = [];
             foreach ($myParents as $parentId) {
                 foreach ($parentsOf((int) $parentId) as $grandParentId) {
@@ -446,6 +531,25 @@ class Ctrl extends Controller
             }
             if (in_array($targetId, $myGrandParents, true)) {
                 $relationLabels[$targetId] = $genderLabel($targetId, 'Grandfather', 'Grandmother', 'Grandparent');
+                continue;
+            }
+
+            $myGrandParentSet = $asSet($myGrandParents);
+            $myStepGrandParents = [];
+            foreach ($myGrandParents as $grandParentId) {
+                foreach ($partnerMap[(int) $grandParentId] ?? [] as $grandParentPartnerId) {
+                    $grandParentPartnerId = (int) $grandParentPartnerId;
+                    if (
+                        $grandParentPartnerId !== $currentMemberId
+                        && !isset($myGrandParentSet[$grandParentPartnerId])
+                        && !isset($myParentSet[$grandParentPartnerId])
+                    ) {
+                        $myStepGrandParents[$grandParentPartnerId] = true;
+                    }
+                }
+            }
+            if (isset($myStepGrandParents[$targetId])) {
+                $relationLabels[$targetId] = $genderLabel($targetId, 'Step Grandfather', 'Step Grandmother', 'Step Grandparent');
                 continue;
             }
 
@@ -499,6 +603,27 @@ class Ctrl extends Controller
                 continue;
             }
 
+            $myStepChildren = [];
+            foreach ($partnerMap[$currentMemberId] ?? [] as $myPartnerId) {
+                foreach ($childrenOf((int) $myPartnerId) as $partnerChildId) {
+                    $partnerChildId = (int) $partnerChildId;
+                    if (!in_array($partnerChildId, $myChildren, true)) {
+                        $myStepChildren[$partnerChildId] = true;
+                    }
+                }
+            }
+
+            $myStepGrandChildren = [];
+            foreach (array_keys($myStepChildren) as $stepChildId) {
+                foreach ($childrenOf((int) $stepChildId) as $stepGrandChildId) {
+                    $myStepGrandChildren[] = (int) $stepGrandChildId;
+                }
+            }
+            if (in_array($targetId, $myStepGrandChildren, true)) {
+                $relationLabels[$targetId] = $genderLabel($targetId, 'Step Grandson', 'Step Granddaughter', 'Step Grandchild');
+                continue;
+            }
+
             $isGrandChildSpouse = false;
             foreach ($myGrandChildren as $grandChildId) {
                 if (in_array($targetId, $partnerMap[(int) $grandChildId] ?? [], true)) {
@@ -544,16 +669,30 @@ class Ctrl extends Controller
                 continue;
             }
 
-            $isUncleAuntyByMarriage = false;
+            $myUnclesAuntsInLaw = [];
             foreach (array_keys($myParentSiblings) as $parentSiblingId) {
                 if (in_array($targetId, $partnerMap[(int) $parentSiblingId] ?? [], true)) {
-                    $isUncleAuntyByMarriage = true;
+                    $myUnclesAuntsInLaw[$targetId] = true;
                     break;
                 }
             }
 
-            if ($isUncleAuntyByMarriage) {
+            if (isset($myUnclesAuntsInLaw[$targetId])) {
                 $relationLabels[$targetId] = $genderLabel($targetId, 'Uncle', 'Aunt', 'Relative');
+                continue;
+            }
+
+            $isCousinInLawByUncleAuntInLaw = false;
+            foreach (array_keys($myParentSiblings) as $parentSiblingId) {
+                foreach ($partnerMap[(int) $parentSiblingId] ?? [] as $uncleAuntInLawId) {
+                    if (in_array($targetId, $childrenOf((int) $uncleAuntInLawId), true)) {
+                        $isCousinInLawByUncleAuntInLaw = true;
+                        break 2;
+                    }
+                }
+            }
+            if ($isCousinInLawByUncleAuntInLaw) {
+                $relationLabels[$targetId] = 'Cousin-in-law';
                 continue;
             }
 
@@ -591,6 +730,25 @@ class Ctrl extends Controller
             }
             if ($isCousinInLaw) {
                 $relationLabels[$targetId] = 'First Cousin In Law';
+                continue;
+            }
+
+            $isFirstCousinChild = false;
+            foreach (array_keys($myParentSiblings) as $parentSiblingId) {
+                foreach ($childrenOf((int) $parentSiblingId) as $cousinId) {
+                    if (in_array($targetId, $childrenOf((int) $cousinId), true)) {
+                        $isFirstCousinChild = true;
+                        break 2;
+                    }
+                }
+            }
+            if ($isFirstCousinChild) {
+                $relationLabels[$targetId] = $genderLabel(
+                    $targetId,
+                    'First cousin once removed / Nephew',
+                    'First cousin once removed / Niece',
+                    'First cousin once removed / Niece/Nephew'
+                );
                 continue;
             }
 
@@ -2822,7 +2980,7 @@ class Ctrl extends Controller
                 if ($remainingPartnerCount === 0) {
                     DB::table('family_member')
                         ->where('memberid', $currentMemberId)
-                        ->update(['marital_status' => 'single']);
+                        ->update(['marital_status' => 'divorced']);
                 }
             }
         });
@@ -2963,6 +3121,8 @@ class Ctrl extends Controller
             return redirect('/')->with('error', 'You can only update life status for yourself, partner, child, parent, or sibling.');
         }
 
+        $isTargetPartner = in_array($targetMemberId, $partnerIds, true);
+
         $targetMember = DB::table('family_member')
             ->where('memberid', $targetMemberId)
             ->select('name', 'gender', 'life_status')
@@ -2975,6 +3135,12 @@ class Ctrl extends Controller
                 'life_status' => $nextLifeStatus,
                 'deaddate' => $nextLifeStatus === 'deceased' ? now()->toDateString() : null,
             ]);
+
+        if ($isTargetPartner && $nextLifeStatus === 'deceased') {
+            DB::table('family_member')
+                ->where('memberid', $currentMemberId)
+                ->update(['marital_status' => 'widowed']);
+        }
 
         $previousLifeStatus = (string) ($targetMember->life_status ?? '');
         if ($previousLifeStatus !== $nextLifeStatus) {
