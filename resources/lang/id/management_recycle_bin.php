@@ -1,0 +1,25 @@
+<?php
+
+return [
+    'title' => 'Tempat Sampah',
+    'description' => 'Pengguna yang dihapus ditampilkan di sini. Tekan lama baris untuk memulai seleksi massal.',
+    'total_users' => 'Total: :count pengguna',
+    'select_deleted_users' => 'Pilih pengguna yang dihapus',
+    'id' => 'ID',
+    'username' => 'Username',
+    'name' => 'Nama',
+    'level' => 'Level',
+    'role' => 'Role',
+    'email' => 'Email',
+    'phone' => 'Telepon',
+    'deleted_at' => 'Dihapus Pada',
+    'action' => 'Aksi',
+    'select_all' => 'Pilih semua',
+    'selected_count' => ':count dipilih',
+    'delete_permanently' => 'Hapus Permanen',
+    'cancel' => 'Batal',
+    'restore' => 'Pulihkan',
+    'delete' => 'Hapus',
+    'delete_permanently_confirm' => 'Hapus permanen pengguna yang dipilih?',
+    'delete_confirm' => 'Hapus permanen pengguna ini?',
+];

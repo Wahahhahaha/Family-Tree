@@ -1,0 +1,25 @@
+<?php
+
+return [
+    'title' => 'Recycle Bin',
+    'description' => 'Deleted users are listed here. Long-press a row to start bulk selection.',
+    'total_users' => 'Total: :count users',
+    'select_deleted_users' => 'Select deleted users',
+    'id' => 'ID',
+    'username' => 'Username',
+    'name' => 'Name',
+    'level' => 'Level',
+    'role' => 'Role',
+    'email' => 'Email',
+    'phone' => 'Phone',
+    'deleted_at' => 'Deleted At',
+    'action' => 'Action',
+    'select_all' => 'Select all',
+    'selected_count' => ':count selected',
+    'delete_permanently' => 'Delete Permanently',
+    'cancel' => 'Cancel',
+    'restore' => 'Restore',
+    'delete' => 'Delete',
+    'delete_permanently_confirm' => 'Permanently delete the selected users?',
+    'delete_confirm' => 'Permanently delete this user?',
+];

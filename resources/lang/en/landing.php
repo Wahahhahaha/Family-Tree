@@ -1,0 +1,27 @@
+<?php
+
+return [
+    'family_tree' => 'Family Tree',
+    'landing_page' => 'Landing Page',
+    'family_story_portal' => 'Family story portal',
+    'public_family_homepage' => 'Public family homepage',
+    'go_home' => 'Go to home',
+    'sign_in' => 'Sign In',
+    'explore_the_board' => 'Explore the Board',
+    'learn_more' => 'Learn More',
+    'head_of_family' => 'Head of Family',
+    'family_head' => 'Family Head',
+    'head_message_fallback' => 'Welcome to our family story.',
+    'public_board' => 'Public board',
+    'family_acknowledgment' => 'Family Acknowledgment',
+    'board_description' => 'Every name and photo on this board can be maintained from the admin settings page.',
+    'created_by' => 'Created By',
+    'designed_by' => 'Designed By',
+    'approved_by' => 'Approved By',
+    'acknowledged_by' => 'Acknowledged By',
+    'not_set_yet' => 'Not set yet',
+    'description_fallback' => 'A private family portal for history, memory, and togetherness.',
+    'select_language' => 'Select language',
+    'english' => 'English',
+    'indonesian' => 'Indonesia',
+];

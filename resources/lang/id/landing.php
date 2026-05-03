@@ -1,0 +1,27 @@
+<?php
+
+return [
+    'family_tree' => 'Pohon Keluarga',
+    'landing_page' => 'Halaman Utama',
+    'family_story_portal' => 'Portal cerita keluarga',
+    'public_family_homepage' => 'Beranda publik keluarga',
+    'go_home' => 'Ke beranda',
+    'sign_in' => 'Masuk',
+    'explore_the_board' => 'Lihat Papan',
+    'learn_more' => 'Pelajari Lebih Lanjut',
+    'head_of_family' => 'Kepala Keluarga',
+    'family_head' => 'Kepala Keluarga',
+    'head_message_fallback' => 'Selamat datang di cerita keluarga kami.',
+    'public_board' => 'Papan publik',
+    'family_acknowledgment' => 'Ucapan Keluarga',
+    'board_description' => 'Setiap nama dan foto di papan ini dapat dikelola dari halaman pengaturan admin.',
+    'created_by' => 'Dibuat oleh',
+    'designed_by' => 'Dirancang oleh',
+    'approved_by' => 'Disetujui oleh',
+    'acknowledged_by' => 'Diketahui oleh',
+    'not_set_yet' => 'Belum diatur',
+    'description_fallback' => 'Portal keluarga privat untuk cerita, kenangan, dan kebersamaan.',
+    'select_language' => 'Pilih bahasa',
+    'english' => 'English',
+    'indonesian' => 'Indonesia',
+];
