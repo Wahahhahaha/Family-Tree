@@ -1,0 +1,28 @@
+<?php
+
+return [
+    'home' => 'Home',
+    'family' => 'Family',
+    'management' => 'Management',
+    'tree_view' => 'Tree View',
+    'calendar' => 'Calendar',
+    'events' => 'Events',
+    'wiki' => 'Family Wiki',
+    'gallery' => 'Gallery',
+    'inheritance' => 'Inheritance',
+    'letters' => 'Letters',
+    'live_location' => 'Live Location',
+    'validation' => 'Validation',
+    'activity_log' => 'Activity Log',
+    'backup' => 'Backup',
+    'master_data' => 'Master Data',
+    'permissions' => 'Permissions',
+    'recycle_bin' => 'Recycle Bin',
+    'system' => 'System',
+    'user_data' => 'User Data',
+    'account_settings' => 'Account Settings',
+    'sign_out' => 'Sign Out',
+    'sign_in' => 'Sign In',
+    'staff' => 'Staff',
+    'family_member' => 'Family',
+];

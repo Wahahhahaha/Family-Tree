@@ -1,0 +1,26 @@
+<?php
+
+return [
+    'title' => 'Dynasty Recycle Bin',
+    'desc' => 'The vault of discarded history. Restore Core Family members to automatically bring back their descendants, or manage system accounts.',
+    'purgatory_active' => 'Purgatory Protocol Active',
+    'ancestry_accounts' => 'Ancestry & Accounts (:count)',
+    'social_master' => 'Social Master (:count)',
+    'cascaded_dependent' => 'Cascaded Dependent',
+    'deleted_on' => 'Deleted on :date',
+    'type_label' => 'Type: :type',
+    'member_type' => 'Family Member',
+    'user_type' => 'System Account',
+    'social_type' => 'Social Platform',
+    'restore' => 'Restore',
+    'restore_cascade_hint' => 'Restore the Core Member to recover this dependent',
+    'erase' => 'Erase',
+    'empty_title' => 'The Void is Empty',
+    'empty_desc' => 'No items in this chronicle are currently discarded.',
+    'protocol_title' => 'Succession Integrity Protocol',
+    'protocol_desc' => 'When a Core Member is restored, all their linked partners and descendants are automatically reintegrated. Dependent members cannot be restored individually to maintain ancestral consistency.',
+    'delete_confirm' => 'ULTIMATE DELETION: Are you absolutely sure you want to PERMANENTLY ERASE this :label (":name")? This action is absolute and cannot be undone.',
+    'delete_confirm_title' => 'Ultimate Erasure',
+    'success_restore' => 'Restoration successful. Ancestry synchronized.',
+    'success_permanent' => ':type permanently erased from existence.',
+];

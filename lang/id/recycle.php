@@ -1,0 +1,26 @@
+<?php
+
+return [
+    'title' => 'Tempat Sampah Dinasti',
+    'desc' => 'Gudang sejarah yang dibuang. Pulihkan anggota Keluarga Inti untuk secara otomatis mengembalikan keturunan mereka, atau kelola akun sistem.',
+    'purgatory_active' => 'Protokol Purgatori Aktif',
+    'ancestry_accounts' => 'Silsilah & Akun (:count)',
+    'social_master' => 'Master Sosial (:count)',
+    'cascaded_dependent' => 'Dependen Bertingkat',
+    'deleted_on' => 'Dihapus pada :date',
+    'type_label' => 'Tipe: :type',
+    'member_type' => 'Anggota Keluarga',
+    'user_type' => 'Akun Sistem',
+    'social_type' => 'Platform Sosial',
+    'restore' => 'Pulihkan',
+    'restore_cascade_hint' => 'Pulihkan Anggota Inti untuk mengembalikan dependen ini',
+    'erase' => 'Hapus Permanen',
+    'empty_title' => 'Kekosongan Abadi',
+    'empty_desc' => 'Tidak ada item dalam catatan ini yang dibuang saat ini.',
+    'protocol_title' => 'Protokol Integritas Suksesi',
+    'protocol_desc' => 'Ketika Anggota Inti dipulihkan, semua pasangan dan keturunan mereka yang terhubung akan dipulihkan secara otomatis. Anggota dependen tidak dapat dipulihkan secara individual untuk menjaga konsistensi leluhur.',
+    'delete_confirm' => 'PENGHAPUSAN AKHIR: Apakah Anda benar-benar yakin ingin MENGHAPUS PERMANEN :label (":name") ini? Tindakan ini mutlak dan tidak dapat dibatalkan.',
+    'delete_confirm_title' => 'Penghapusan Akhir',
+    'success_restore' => 'Pemulihan berhasil. Silsilah disinkronkan.',
+    'success_permanent' => ':type berhasil dihapus secara permanen dari keberadaan.',
+];

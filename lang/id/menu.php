@@ -1,0 +1,28 @@
+<?php
+
+return [
+    'home' => 'Beranda',
+    'family' => 'Keluarga',
+    'management' => 'Manajemen',
+    'tree_view' => 'Tampilan Silsilah',
+    'calendar' => 'Kalender',
+    'events' => 'Kegiatan',
+    'wiki' => 'Wiki Keluarga',
+    'gallery' => 'Galeri',
+    'inheritance' => 'Waris',
+    'letters' => 'Surat',
+    'live_location' => 'Lokasi Terkini',
+    'validation' => 'Validasi',
+    'activity_log' => 'Log Aktivitas',
+    'backup' => 'Cadangan',
+    'master_data' => 'Data Master',
+    'permissions' => 'Izin',
+    'recycle_bin' => 'Tempat Sampah',
+    'system' => 'Sistem',
+    'user_data' => 'Data Pengguna',
+    'account_settings' => 'Pengaturan Akun',
+    'sign_out' => 'Keluar',
+    'sign_in' => 'Masuk',
+    'staff' => 'Staf',
+    'family_member' => 'Keluarga',
+];

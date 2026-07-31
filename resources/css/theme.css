@@ -1,0 +1,207 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700&display=swap');
+
+:root {
+    --bg: #f4f8fb;
+    --surface: #ffffff;
+    --surface-soft: #f1f7fb;
+    --text: #102133;
+    --muted: #688197;
+    --line: #d5e3ee;
+    --primary: #219ad6;
+    --primary-deep: #157eb6;
+    --accent: #18b382;
+    --shadow: 0 25px 60px rgba(14, 48, 73, 0.12);
+    --ring: rgba(33, 154, 214, 0.2);
+    --tree-line: #00a0f0;
+}
+
+body {
+    font-family: "Manrope", "Segoe UI", sans-serif;
+    background-color: var(--bg);
+    color: var(--text);
+    margin: 0;
+}
+
+h1, h2, h3, .font-sora {
+    font-family: "Sora", sans-serif;
+}
+
+/* Base Wrapper */
+.page-wrapper {
+    width: 100%;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+/* --- FLEXBOX FAMILY TREE STRUCTURE (BOTTOM-UP MODEL) --- */
+
+/* All <ul> must be flex and centered */
+.tree-ul {
+    display: inline-flex;
+    justify-content: center;
+    position: relative;
+    padding-top: 20px;
+    margin: 0;
+    list-style-type: none;
+    padding-left: 0;
+    min-width: 100%;
+}
+
+/* Line connecting Parent to Child group */
+.tree-ul::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    border-left: 2px solid var(--tree-line);
+    width: 0;
+    height: 20px;
+    transform: translateX(-50%);
+}
+
+/* Primary Root container shouldn't have top vertical line */
+.tree-ul:first-of-type:not(.is-root-li .tree-ul) {
+    padding-top: 0;
+}
+.tree-ul:first-of-type:not(.is-root-li .tree-ul)::before {
+    display: none !important;
+}
+
+/* All <li> as centered columns */
+.tree-li {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    padding: 20px 10px 0 10px;
+}
+
+/* Horizontal connectors using 50% split of the container */
+.tree-li::before, .tree-li::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 50%;
+    border-top: 2px solid var(--tree-line);
+    width: 50%;
+    height: 20px;
+}
+
+.tree-li::after {
+    right: auto;
+    left: 50%;
+    /* NO border-left here! The vertical line comes UP from the child */
+}
+
+/* Anti-Bleeding: Cut ends for first/last children */
+.tree-li:first-child::before {
+    border: none !important;
+}
+
+.tree-li:last-child::after {
+    border-top: none !important;
+}
+
+/* Only-child logic: remove horizontal bar entirely */
+.tree-li:only-child::before, .tree-li:only-child::after {
+    border-top: none !important;
+}
+
+/* Root Node Rule: Absolutely no top lines */
+.is-root-li::before, .is-root-li::after {
+    display: none !important;
+}
+
+.is-root-li {
+    padding-top: 0 !important;
+}
+
+/* Vertical line UP from node wrapper to meet the horizontal bar */
+.node-card-wrapper::before {
+    content: '';
+    position: absolute;
+    top: -20px; /* Moves line UP above the wrapper */
+    left: 50%;
+    height: 20px;
+    border-left: 2px solid var(--tree-line);
+    transform: translateX(-50%);
+    z-index: 0;
+}
+
+/* Vertical line DOWN from parent node to children group */
+.node-card-wrapper.has-children::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    bottom: -20px;
+    border-left: 2px solid var(--tree-line);
+    transform: translateX(-50%);
+    z-index: -1;
+}
+
+/* Root node wrapper shouldn't draw a line up */
+.is-root-li > .node-card-wrapper::before {
+    display: none !important;
+}
+
+/* Card Wrapper (Must be fit-content) */
+.node-card-wrapper {
+    width: fit-content;
+    display: flex;
+    align-items: center;
+    position: relative;
+    z-index: 10;
+}
+
+/* --- Navbar / UI Elements (Restored) --- */
+.topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    height: 80px;
+    background: #ffffff;
+    border: 1px solid #eaf1f6;
+    border-radius: 24px;
+    box-shadow: 0 12px 34px rgba(16, 53, 77, 0.08);
+    margin-bottom: 24px;
+}
+.topbar .brand { display: flex; align-items: center; gap: 16px; }
+.topbar .brand-mark {
+    width: 48px; height: 48px; background: #f0f7ff; border: 1.5px solid #dbeafe; border-radius: 14px;
+    display: grid; place-items: center; font-weight: 800; color: var(--primary);
+}
+.topbar .brand-info h1 { font-size: 18px; font-weight: 800; margin: 0; color: #12344a; }
+.topbar .brand-info p { font-size: 11px; font-weight: 700; margin: 2px 0 0; color: #94a3b8; text-transform: uppercase; }
+.topbar .actions { display: flex; align-items: center; gap: 12px; }
+
+.btn-soft {
+    display: inline-flex; align-items: center; gap: 8px; background: #f0f7ff; color: #219ad6;
+    border: 1px solid #dbeafe; padding: 10px 18px; border-radius: 14px; font-weight: 700; font-size: 14px;
+}
+.btn-ghost {
+    display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px;
+    background: transparent; color: #64748b; border: 1.5px solid transparent; border-radius: 14px;
+}
+.user-profile-btn {
+    display: flex; align-items: center; gap: 12px; padding: 6px 6px 6px 16px; background: #ffffff;
+    border: 1.5px solid #f1f5f9; border-radius: 18px;
+}
+.user-avatar {
+    width: 40px; height: 40px; border-radius: 12px; background: #eff6ff; border: 1.5px solid #dbeafe;
+    display: flex; align-items: center; justify-content: center; color: var(--primary);
+}
+
+.dropdown-panel {
+    position: absolute; top: calc(100% + 12px); right: 0; width: 240px; background: #ffffff;
+    border: 1px solid #f1f5f9; border-radius: 20px; box-shadow: 0 20px 50px rgba(15, 23, 42, 0.1);
+    z-index: 100; padding: 8px;
+}
+.dropdown-item {
+    display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 12px;
+    color: #475569; font-size: 14px; font-weight: 600;
+}
+.dropdown-item:hover { background: #f8fafc; color: var(--primary); }
+.dropdown-item.danger:hover { background: #fff1f2; color: #e11d48; }
